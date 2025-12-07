@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback } from 'react';
+import { useRef, useEffect, useCallback, useState } from 'react';
 import type { Loop, NoteEvent } from '../types';
 
 interface OrbitalViewProps {
@@ -7,6 +7,8 @@ interface OrbitalViewProps {
   isPlaying: boolean;
   tempo: number;
   realignmentBar: number;
+  onPatternChange?: (loopId: string, pattern: NoteEvent[]) => void;
+  editableLoopIds?: string[]; // Which loops the current player can edit
 }
 
 // Convert note to pitch value (0-127, MIDI style)
@@ -22,11 +24,26 @@ function noteToPitch(note: string): number {
   return (octave + 1) * 12 + noteMap[noteName];
 }
 
+// Convert pitch to note string
+function pitchToNote(pitch: number): string {
+  const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  const octave = Math.floor(pitch / 12) - 1;
+  const noteName = noteNames[pitch % 12];
+  return `${noteName}${octave}`;
+}
+
 // Normalize pitch to 0-1 range for visualization (C2=0, C6=1)
 function normalizePitch(pitch: number): number {
   const minPitch = 36; // C2
   const maxPitch = 84; // C6
   return Math.max(0, Math.min(1, (pitch - minPitch) / (maxPitch - minPitch)));
+}
+
+// Denormalize 0-1 range back to pitch
+function denormalizePitch(normalized: number): number {
+  const minPitch = 36; // C2
+  const maxPitch = 84; // C6
+  return Math.round(minPitch + normalized * (maxPitch - minPitch));
 }
 
 // Calculate LCM of two numbers
@@ -41,15 +58,156 @@ function lcmArray(arr: number[]): number {
   return arr.reduce((acc, val) => lcm(acc, val), arr[0]);
 }
 
+// Queued pattern change
+interface QueuedChange {
+  loopId: string;
+  pattern: NoteEvent[];
+  applyAtBar: number; // Bar number when change should apply
+}
+
 export function OrbitalView({
   loops,
   currentBar,
   isPlaying,
   tempo,
   realignmentBar,
+  onPatternChange,
+  editableLoopIds = [],
 }: OrbitalViewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number>(0);
+  const [selectedLoop, setSelectedLoop] = useState<string | null>(null);
+  const [queuedChanges, setQueuedChanges] = useState<QueuedChange[]>([]);
+  const [pendingPattern, setPendingPattern] = useState<NoteEvent[] | null>(null);
+  const lastAppliedBarRef = useRef<number>(-1);
+
+  // Store layout info for click detection
+  const layoutRef = useRef<{
+    centerX: number;
+    centerY: number;
+    rings: { loopId: string; radius: number; bars: number }[];
+    cycleLength: number;
+  }>({ centerX: 0, centerY: 0, rings: [], cycleLength: 1 });
+
+  // Apply queued changes when loop restarts
+  useEffect(() => {
+    if (queuedChanges.length === 0) return;
+
+    const changesToApply = queuedChanges.filter(change => {
+      const loop = loops.find(l => l.id === change.loopId);
+      if (!loop) return false;
+      // Check if we've crossed a loop boundary
+      const loopPosition = currentBar % loop.bars;
+      return loopPosition === 0 && lastAppliedBarRef.current !== currentBar;
+    });
+
+    if (changesToApply.length > 0) {
+      changesToApply.forEach(change => {
+        if (onPatternChange) {
+          onPatternChange(change.loopId, change.pattern);
+        }
+      });
+
+      // Remove applied changes
+      setQueuedChanges(prev =>
+        prev.filter(c => !changesToApply.some(applied => applied.loopId === c.loopId))
+      );
+      setPendingPattern(null);
+      lastAppliedBarRef.current = currentBar;
+    }
+  }, [currentBar, queuedChanges, loops, onPatternChange]);
+
+  // Handle click on canvas
+  const handleCanvasClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const { centerX, centerY, rings, cycleLength } = layoutRef.current;
+
+    // Calculate distance from center and angle
+    const dx = x - centerX;
+    const dy = y - centerY;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    let angle = Math.atan2(dy, dx) + Math.PI / 2; // Adjust so 0 is at top
+    if (angle < 0) angle += Math.PI * 2;
+
+    // Find which ring was clicked
+    const clickedRing = rings.find(ring =>
+      Math.abs(distance - ring.radius) < 20 // Within ring width
+    );
+
+    if (!clickedRing) {
+      setSelectedLoop(null);
+      return;
+    }
+
+    // Check if this is an editable loop
+    const isEditable = editableLoopIds.includes(clickedRing.loopId);
+    if (editableLoopIds.length > 0 && !isEditable) {
+      // Can't edit other players' loops
+      setSelectedLoop(clickedRing.loopId);
+      return;
+    }
+
+    setSelectedLoop(clickedRing.loopId);
+
+    // Find the loop
+    const loop = loops.find(l => l.id === clickedRing.loopId);
+    if (!loop || !onPatternChange) return;
+
+    // Calculate time position from angle (only for first repetition of loop)
+    const cyclePos = angle / (Math.PI * 2);
+    const beatInCycle = cyclePos * cycleLength * 4; // 4 beats per bar
+    const beatInLoop = beatInCycle % (loop.bars * 4);
+    const quantizedBeat = Math.round(beatInLoop * 2) / 2; // Quantize to 8th notes
+
+    // Calculate pitch from radial offset
+    const ringRadius = clickedRing.radius;
+    const pitchOffset = (distance - ringRadius) / 16; // -1 to +1 range
+    const normalizedPitch = 0.5 + pitchOffset;
+    const pitch = denormalizePitch(Math.max(0, Math.min(1, normalizedPitch)));
+    const note = pitchToNote(pitch);
+
+    // Check if there's already a note at this position
+    const currentPattern = pendingPattern || [...loop.pattern];
+    const existingIndex = currentPattern.findIndex(n =>
+      Math.abs(n.time - quantizedBeat) < 0.25
+    );
+
+    let newPattern: NoteEvent[];
+    if (existingIndex >= 0) {
+      // Remove existing note
+      newPattern = currentPattern.filter((_, i) => i !== existingIndex);
+    } else {
+      // Add new note
+      newPattern = [...currentPattern, {
+        note,
+        time: quantizedBeat,
+        duration: '8n',
+        velocity: 0.8
+      }].sort((a, b) => a.time - b.time);
+    }
+
+    // Queue the change to apply at loop end
+    if (isPlaying) {
+      setPendingPattern(newPattern);
+      setQueuedChanges(prev => {
+        // Replace existing queued change for this loop
+        const filtered = prev.filter(c => c.loopId !== loop.id);
+        return [...filtered, {
+          loopId: loop.id,
+          pattern: newPattern,
+          applyAtBar: Math.ceil(currentBar / loop.bars) * loop.bars
+        }];
+      });
+    } else {
+      // Not playing, apply immediately
+      onPatternChange(loop.id, newPattern);
+    }
+  }, [loops, editableLoopIds, onPatternChange, isPlaying, currentBar, pendingPattern]);
 
   const draw = useCallback(
     () => {
@@ -77,6 +235,19 @@ export function OrbitalView({
 
       // Current position in the cycle
       const cyclePosition = currentBar % cycleLength;
+
+      // Store layout for click detection
+      const rings: { loopId: string; radius: number; bars: number }[] = [];
+      const ringSpacing = 35;
+      const baseRadius = maxRadius - (loops.length - 1) * ringSpacing;
+      loops.forEach((loop, index) => {
+        rings.push({
+          loopId: loop.id,
+          radius: baseRadius + index * ringSpacing,
+          bars: loop.bars
+        });
+      });
+      layoutRef.current = { centerX, centerY, rings, cycleLength };
 
       // Draw cycle info at top
       ctx.fillStyle = '#888';
@@ -115,23 +286,32 @@ export function OrbitalView({
         ctx.fillText('STOPPED', centerX, centerY + 59);
       }
 
-      // Draw unified rings for each loop - ALL same size, ALL same divisions
-      const ringSpacing = 35;
-      const baseRadius = maxRadius - (loops.length - 1) * ringSpacing;
-
+      // Draw unified rings for each loop
       loops.forEach((loop, index) => {
         const radius = baseRadius + index * ringSpacing;
         const isActive = !loop.muted;
+        const isSelected = selectedLoop === loop.id;
+        const isEditable = editableLoopIds.includes(loop.id);
+        const hasQueuedChange = queuedChanges.some(c => c.loopId === loop.id);
 
-        // Draw the ring with cycle divisions (all rings have same number of divisions)
+        // Draw the ring with cycle divisions
         ctx.beginPath();
         ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
         ctx.strokeStyle = isActive ? `${loop.color}30` : '#333';
         ctx.lineWidth = 24;
         ctx.stroke();
 
-        // Draw measure markers on the ring (same for all rings)
-        const markerInterval = Math.max(1, Math.floor(cycleLength / 40)); // Don't draw too many
+        // Highlight if selected/editable
+        if (isSelected || isEditable) {
+          ctx.beginPath();
+          ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+          ctx.strokeStyle = isEditable ? `${loop.color}50` : `${loop.color}20`;
+          ctx.lineWidth = 28;
+          ctx.stroke();
+        }
+
+        // Draw measure markers on the ring
+        const markerInterval = Math.max(1, Math.floor(cycleLength / 40));
         for (let i = 0; i < cycleLength; i += markerInterval) {
           const angle = (i / cycleLength) * Math.PI * 2 - Math.PI / 2;
           const innerR = radius - 12;
@@ -151,13 +331,12 @@ export function OrbitalView({
           ctx.stroke();
         }
 
-        // Draw loop restart markers (where this loop starts over within the cycle)
+        // Draw loop restart markers
         for (let i = 0; i < cycleLength; i += loop.bars) {
           const angle = (i / cycleLength) * Math.PI * 2 - Math.PI / 2;
           const markerX = centerX + Math.cos(angle) * radius;
           const markerY = centerY + Math.sin(angle) * radius;
 
-          // Draw restart marker (triangle pointing inward)
           ctx.save();
           ctx.translate(markerX, markerY);
           ctx.rotate(angle + Math.PI / 2);
@@ -173,12 +352,16 @@ export function OrbitalView({
           ctx.restore();
         }
 
-        // Draw note pattern visualization (dots on the ring showing pitch)
-        if (loop.pattern && loop.pattern.length > 0) {
+        // Get pattern to display (pending if queued, otherwise current)
+        const displayPattern = hasQueuedChange
+          ? (pendingPattern || loop.pattern)
+          : loop.pattern;
+
+        // Draw note pattern visualization
+        if (displayPattern && displayPattern.length > 0) {
           const beatsPerBar = 4;
 
-          loop.pattern.forEach((note: NoteEvent) => {
-            // For each repetition of the loop within the cycle
+          displayPattern.forEach((note: NoteEvent) => {
             for (let rep = 0; rep < cycleLength / loop.bars; rep++) {
               const baseBar = rep * loop.bars;
               const beatInCycle = baseBar * beatsPerBar + note.time;
@@ -186,25 +369,35 @@ export function OrbitalView({
 
               const angle = cyclePos * Math.PI * 2 - Math.PI / 2;
 
-              // Use pitch to determine radial offset (higher = outer, lower = inner)
               const pitch = noteToPitch(note.note);
               const normalizedPitch = normalizePitch(pitch);
-              const pitchOffset = (normalizedPitch - 0.5) * 16; // -8 to +8 pixels
+              const pitchOffset = (normalizedPitch - 0.5) * 16;
 
               const noteRadius = radius + pitchOffset;
               const noteX = centerX + Math.cos(angle) * noteRadius;
               const noteY = centerY + Math.sin(angle) * noteRadius;
 
-              // Draw note dot
+              // Draw note dot with transparency
               ctx.beginPath();
-              ctx.arc(noteX, noteY, isActive ? 3 : 2, 0, Math.PI * 2);
-              ctx.fillStyle = isActive ? '#fff' : '#666';
+              ctx.arc(noteX, noteY, isActive ? 4 : 2, 0, Math.PI * 2);
+              // Use different opacity for pending changes
+              const alpha = hasQueuedChange ? '66' : 'aa';
+              ctx.fillStyle = isActive ? `${loop.color}${alpha}` : '#66666666';
               ctx.fill();
+
+              // Add pulsing effect for pending notes
+              if (hasQueuedChange && isActive) {
+                ctx.beginPath();
+                ctx.arc(noteX, noteY, 6, 0, Math.PI * 2);
+                ctx.strokeStyle = `${loop.color}44`;
+                ctx.lineWidth = 1;
+                ctx.stroke();
+              }
             }
           });
         }
 
-        // Draw progress arc (how far through the cycle)
+        // Draw progress arc
         const startAngle = -Math.PI / 2;
         const progressAngle = startAngle + (cyclePosition / cycleLength) * Math.PI * 2;
 
@@ -218,7 +411,6 @@ export function OrbitalView({
         const playheadX = centerX + Math.cos(progressAngle) * radius;
         const playheadY = centerY + Math.sin(progressAngle) * radius;
 
-        // Glow
         const gradient = ctx.createRadialGradient(
           playheadX, playheadY, 0,
           playheadX, playheadY, 20
@@ -230,7 +422,6 @@ export function OrbitalView({
         ctx.fillStyle = gradient;
         ctx.fill();
 
-        // Dot
         ctx.beginPath();
         ctx.arc(playheadX, playheadY, 6, 0, Math.PI * 2);
         ctx.fillStyle = '#fff';
@@ -252,6 +443,17 @@ export function OrbitalView({
           centerX - radius - 20,
           centerY + 16
         );
+
+        // Show queued indicator
+        if (hasQueuedChange) {
+          ctx.fillStyle = '#f59e0b';
+          ctx.font = '9px monospace';
+          ctx.fillText(
+            '⏳ queued',
+            centerX - radius - 20,
+            centerY + 28
+          );
+        }
       });
 
       // Draw "bars until realign" countdown
@@ -263,8 +465,16 @@ export function OrbitalView({
         ctx.fillText(
           `↻ ${barsUntilRealign} bars to realign`,
           centerX,
-          height - 25
+          height - 40
         );
+      }
+
+      // Draw editing hint
+      if (editableLoopIds.length > 0) {
+        ctx.fillStyle = '#888';
+        ctx.font = '11px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('Click on your loop to add/remove notes', centerX, height - 22);
       }
 
       // Legend at bottom
@@ -275,7 +485,7 @@ export function OrbitalView({
 
       animationRef.current = requestAnimationFrame(draw);
     },
-    [loops, currentBar, isPlaying, tempo, realignmentBar]
+    [loops, currentBar, isPlaying, tempo, realignmentBar, selectedLoop, editableLoopIds, queuedChanges, pendingPattern]
   );
 
   useEffect(() => {
@@ -305,11 +515,13 @@ export function OrbitalView({
   return (
     <canvas
       ref={canvasRef}
+      onClick={handleCanvasClick}
       style={{
         width: '100%',
         height: '100%',
         display: 'block',
         background: '#0a0a0f',
+        cursor: editableLoopIds.length > 0 ? 'crosshair' : 'default',
       }}
     />
   );
