@@ -46,7 +46,7 @@ export function LoopPad({ loop, currentBar, onToggle, onEdit }: LoopPadProps) {
       title={`${loop.name} (${instrumentInfo.label}) - ${loop.bars} bar${loop.bars > 1 ? 's' : ''}`}
     >
       <div className="loop-pad-progress" />
-      <span className="loop-pad-emoji">{instrumentInfo.emoji}</span>
+      <span className="loop-pad-icon">{instrumentInfo.icon}</span>
       <span className="loop-pad-label">{loop.name}</span>
       <span className="loop-pad-status">
         {isActive ? `${currentLoopBar}/${loop.bars}` : `${loop.bars}b`}

@@ -401,12 +401,14 @@ const ARPEGGIO_2_PATTERN: NoteEvent[] = [
   { note: 'C4', time: 23, duration: '8n' }, { note: 'G4', time: 23.5, duration: '8n' },
 ];
 
-// Default loops for new players - Incredibox-style variety
-// Each loop has a different instrument to cover all musical registers
+// Default loops for new players - Incredibox-style instrument matrix
+// Fixed mapping: instrument type -> bar length for polymetric feel
+// Drums=1bar, Bass=2bars, Arp=3bars, Chords=4bars,
+// Lead=5bars, Arp2=6bars, FX=7bars, Vocal=8bars
 const DEFAULT_LOOPS: Omit<Loop, 'id'>[] = [
   { name: 'Drums', bars: 1, color: '#ef4444', pattern: DRUM_PATTERN, volume: 0.8, muted: true, instrument: 'drums' },
   { name: 'Bass', bars: 2, color: '#f97316', pattern: BASS_PATTERN, volume: 0.7, muted: true, instrument: 'bass' },
-  { name: 'Arp 1', bars: 3, color: '#eab308', pattern: ARPEGGIO_PATTERN, volume: 0.6, muted: true, instrument: 'arpeggio' },
+  { name: 'Arp', bars: 3, color: '#eab308', pattern: ARPEGGIO_PATTERN, volume: 0.6, muted: true, instrument: 'arpeggio' },
   { name: 'Chords', bars: 4, color: '#22c55e', pattern: CHORD_PATTERN, volume: 0.5, muted: true, instrument: 'chord' },
   { name: 'Lead', bars: 5, color: '#3b82f6', pattern: LEAD_PATTERN, volume: 0.6, muted: true, instrument: 'lead' },
   { name: 'Arp 2', bars: 6, color: '#14b8a6', pattern: ARPEGGIO_2_PATTERN, volume: 0.5, muted: true, instrument: 'arpeggio' },

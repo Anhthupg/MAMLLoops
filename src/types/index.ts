@@ -29,14 +29,14 @@ export type InstrumentType =
   | 'vocal';    // Vocal-like synth sounds
 
 // Instrument display info
-export const INSTRUMENT_INFO: Record<InstrumentType, { label: string; emoji: string; color: string }> = {
-  drums: { label: 'Drums', emoji: '🥁', color: '#ef4444' },
-  bass: { label: 'Bass', emoji: '🎸', color: '#f97316' },
-  chord: { label: 'Chord', emoji: '🎹', color: '#eab308' },
-  arpeggio: { label: 'Arp', emoji: '🎵', color: '#22c55e' },
-  lead: { label: 'Lead', emoji: '🎤', color: '#3b82f6' },
-  fx: { label: 'FX', emoji: '✨', color: '#8b5cf6' },
-  vocal: { label: 'Vocal', emoji: '🗣️', color: '#ec4899' },
+export const INSTRUMENT_INFO: Record<InstrumentType, { label: string; icon: string; color: string }> = {
+  drums: { label: 'Drums', icon: 'DR', color: '#ef4444' },
+  bass: { label: 'Bass', icon: 'BS', color: '#f97316' },
+  chord: { label: 'Chord', icon: 'CH', color: '#eab308' },
+  arpeggio: { label: 'Arp', icon: 'AR', color: '#22c55e' },
+  lead: { label: 'Lead', icon: 'LD', color: '#3b82f6' },
+  fx: { label: 'FX', icon: 'FX', color: '#8b5cf6' },
+  vocal: { label: 'Vocal', icon: 'VO', color: '#ec4899' },
 };
 
 export interface Player {
