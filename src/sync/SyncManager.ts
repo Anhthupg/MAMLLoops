@@ -1,25 +1,104 @@
 import { v4 as uuidv4 } from 'uuid';
+import Peer, { DataConnection } from 'peerjs';
 import type { RoomState, Player, SyncMessage, Loop, Section } from '../types';
 
 type MessageHandler = (message: SyncMessage) => void;
 
-// For prototype: Use BroadcastChannel for same-device testing
-// and a simple WebSocket-like interface for future expansion
-class LocalSync {
-  private channel: BroadcastChannel;
+// Cross-device sync using PeerJS (WebRTC)
+class PeerSync {
+  private peer: Peer;
+  private connections: Map<string, DataConnection> = new Map();
   private handlers: Set<MessageHandler> = new Set();
+  private roomId: string;
+  private isHost: boolean;
+  private hostConnection: DataConnection | null = null;
 
-  constructor(roomId: string) {
-    this.channel = new BroadcastChannel(`maml-room-${roomId}`);
-    this.channel.onmessage = (event) => {
-      this.handlers.forEach((handler) => handler(event.data));
-    };
+  constructor(roomId: string, isHost: boolean) {
+    this.roomId = roomId;
+    this.isHost = isHost;
+
+    // Create peer with room-based ID for host, random for others
+    const peerId = isHost ? `maml-${roomId}` : `maml-${roomId}-${uuidv4().slice(0, 6)}`;
+
+    this.peer = new Peer(peerId, {
+      debug: 0, // Set to 2 for debugging
+    });
+
+    this.peer.on('open', () => {
+      console.log('Peer connected:', this.peer.id);
+      if (!isHost) {
+        // Connect to host
+        this.connectToHost();
+      }
+    });
+
+    this.peer.on('connection', (conn) => {
+      this.setupConnection(conn);
+    });
+
+    this.peer.on('error', (err) => {
+      console.error('Peer error:', err);
+      // If host doesn't exist, we might be the first one
+      if (err.type === 'peer-unavailable') {
+        console.log('Host not available yet');
+      }
+    });
+  }
+
+  private connectToHost(): void {
+    const hostId = `maml-${this.roomId}`;
+    console.log('Connecting to host:', hostId);
+    const conn = this.peer.connect(hostId, { reliable: true });
+    this.hostConnection = conn;
+    this.setupConnection(conn);
+  }
+
+  private setupConnection(conn: DataConnection): void {
+    conn.on('open', () => {
+      console.log('Connection opened:', conn.peer);
+      this.connections.set(conn.peer, conn);
+    });
+
+    conn.on('data', (data) => {
+      const message = data as SyncMessage;
+      // Handle received message
+      this.handlers.forEach((handler) => handler(message));
+
+      // If we're host, broadcast to all other peers
+      if (this.isHost) {
+        this.broadcast(message, conn.peer);
+      }
+    });
+
+    conn.on('close', () => {
+      console.log('Connection closed:', conn.peer);
+      this.connections.delete(conn.peer);
+    });
+
+    conn.on('error', (err) => {
+      console.error('Connection error:', err);
+    });
+  }
+
+  private broadcast(message: SyncMessage, excludePeer?: string): void {
+    this.connections.forEach((conn, peerId) => {
+      if (peerId !== excludePeer && conn.open) {
+        conn.send(message);
+      }
+    });
   }
 
   send(message: SyncMessage): void {
-    this.channel.postMessage(message);
-    // Also trigger local handlers for immediate feedback
+    // Always handle locally first
     this.handlers.forEach((handler) => handler(message));
+
+    if (this.isHost) {
+      // Broadcast to all connected peers
+      this.broadcast(message);
+    } else if (this.hostConnection?.open) {
+      // Send to host
+      this.hostConnection.send(message);
+    }
   }
 
   onMessage(handler: MessageHandler): () => void {
@@ -28,15 +107,20 @@ class LocalSync {
   }
 
   close(): void {
-    this.channel.close();
+    this.connections.forEach((conn) => conn.close());
+    this.peer.destroy();
+  }
+
+  getConnectionCount(): number {
+    return this.connections.size;
   }
 }
 
 // Default loops for new players
 const DEFAULT_LOOPS: Omit<Loop, 'id'>[] = [
-  { name: 'Pattern 4', bars: 4, color: '#f472b6', pattern: [], volume: 0.7, muted: true },
-  { name: 'Pattern 5', bars: 5, color: '#60a5fa', pattern: [], volume: 0.7, muted: true },
-  { name: 'Pattern 8', bars: 8, color: '#4ade80', pattern: [], volume: 0.7, muted: true },
+  { name: 'Glass 4', bars: 4, color: '#f472b6', pattern: [], volume: 0.7, muted: true },
+  { name: 'Glass 5', bars: 5, color: '#60a5fa', pattern: [], volume: 0.7, muted: true },
+  { name: 'Glass 8', bars: 8, color: '#4ade80', pattern: [], volume: 0.7, muted: true },
 ];
 
 // Default sections
@@ -49,14 +133,17 @@ const DEFAULT_SECTIONS: Omit<Section, 'id'>[] = [
 export class SyncManager {
   private roomId: string;
   private playerId: string;
-  private sync: LocalSync;
+  private sync: PeerSync;
   private state: RoomState;
   private stateListeners: Set<(state: RoomState) => void> = new Set();
+  private isHost: boolean;
 
   constructor(roomId?: string) {
-    this.roomId = roomId || uuidv4().slice(0, 8);
+    // If no roomId provided, we're creating a new room (host)
+    this.isHost = !roomId;
+    this.roomId = roomId || uuidv4().slice(0, 6).toUpperCase();
     this.playerId = uuidv4();
-    this.sync = new LocalSync(this.roomId);
+    this.sync = new PeerSync(this.roomId, this.isHost);
 
     // Initialize state
     this.state = {
@@ -102,7 +189,11 @@ export class SyncManager {
       isReady: false,
     };
 
-    this.sync.send({ type: 'join', player });
+    // Small delay to ensure connection is established
+    setTimeout(() => {
+      this.sync.send({ type: 'join', player });
+    }, this.isHost ? 0 : 1000);
+
     return player;
   }
 
