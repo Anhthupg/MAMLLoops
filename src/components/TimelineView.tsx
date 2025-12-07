@@ -16,6 +16,9 @@ interface TimelineViewProps {
   isPlaying: boolean;
   tempo: number;
   onPatternChange?: (loopId: string, pattern: NoteEvent[]) => void;
+  onPreviewPattern?: (pattern: NoteEvent[], bars: number) => void;
+  onStopPreview?: () => void;
+  onPreviewNote?: (note: string) => void;
   editableLoopIds?: string[];
   queuedChanges?: QueuedPatternChange[];
 }
@@ -77,6 +80,9 @@ export function TimelineView({
   isPlaying,
   tempo,
   onPatternChange,
+  onPreviewPattern,
+  onStopPreview,
+  onPreviewNote,
   editableLoopIds = [],
   queuedChanges = [],
 }: TimelineViewProps) {
@@ -84,6 +90,7 @@ export function TimelineView({
   const animationRef = useRef<number>(0);
   const [hoveredTrack, setHoveredTrack] = useState<string | null>(null);
   const [subdivision, setSubdivision] = useState<typeof SUBDIVISIONS[number]>(SUBDIVISIONS[1]); // Default 1/8
+  const [previewingLoopId, setPreviewingLoopId] = useState<string | null>(null);
 
   // Constants
   const BEATS_PER_BAR = 4;
@@ -537,7 +544,39 @@ export function TimelineView({
     }
 
     onPatternChange(loop.id, newPattern);
-  }, [loops, editableLoopIds, onPatternChange, motherLoopBeats, getQueuedPattern, BEATS_PER_BAR, subdivision]);
+
+    // Play the note for audition feedback
+    if (onPreviewNote && existingIndex < 0) {
+      onPreviewNote(clickedNote);
+    }
+  }, [loops, editableLoopIds, onPatternChange, motherLoopBeats, getQueuedPattern, BEATS_PER_BAR, subdivision, onPreviewNote]);
+
+  // Preview a loop's queued pattern
+  const handlePreview = useCallback((loopId: string) => {
+    const loop = loops.find(l => l.id === loopId);
+    if (!loop || !onPreviewPattern) return;
+
+    const queuedChange = getQueuedPattern(loopId);
+    const patternToPreview = queuedChange ? queuedChange.pattern : loop.pattern;
+
+    if (patternToPreview && patternToPreview.length > 0) {
+      setPreviewingLoopId(loopId);
+      onPreviewPattern(patternToPreview, loop.bars);
+
+      // Auto-stop preview after one cycle
+      const cycleDurationMs = (loop.bars * BEATS_PER_BAR * 60 * 1000) / tempo;
+      setTimeout(() => {
+        setPreviewingLoopId(null);
+      }, cycleDurationMs + 100);
+    }
+  }, [loops, onPreviewPattern, getQueuedPattern, BEATS_PER_BAR, tempo]);
+
+  const handleStopPreview = useCallback(() => {
+    if (onStopPreview) {
+      onStopPreview();
+    }
+    setPreviewingLoopId(null);
+  }, [onStopPreview]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -562,6 +601,10 @@ export function TimelineView({
       }
     };
   }, [draw]);
+
+  // Calculate track positions for preview buttons
+  const headerHeight = 40;
+  const trackHeight = loops.length > 0 ? (300 - headerHeight) / loops.length : 0;
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -599,6 +642,46 @@ export function TimelineView({
           </button>
         ))}
       </div>
+
+      {/* Preview buttons overlay */}
+      {loops.map((loop, index) => {
+        const isEditable = editableLoopIds.includes(loop.id);
+        const hasQueued = queuedChanges.some(c => c.loopId === loop.id);
+        const isPreviewing = previewingLoopId === loop.id;
+
+        if (!isEditable) return null;
+
+        return (
+          <button
+            key={`preview-${loop.id}`}
+            onClick={() => isPreviewing ? handleStopPreview() : handlePreview(loop.id)}
+            style={{
+              position: 'absolute',
+              left: 50,
+              top: headerHeight + index * trackHeight + trackHeight - 20,
+              width: 24,
+              height: 16,
+              background: isPreviewing ? '#f59e0b' : hasQueued ? '#3b82f6' : '#252542',
+              color: isPreviewing ? '#000' : '#fff',
+              border: 'none',
+              borderRadius: 3,
+              fontSize: 8,
+              fontFamily: 'monospace',
+              cursor: 'pointer',
+              zIndex: 10,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              opacity: loop.pattern.length > 0 || hasQueued ? 1 : 0.3,
+            }}
+            title={isPreviewing ? 'Stop preview' : 'Preview pattern (DJ pre-listen)'}
+            disabled={loop.pattern.length === 0 && !hasQueued}
+          >
+            {isPreviewing ? '■' : '▶'}
+          </button>
+        );
+      })}
+
       <canvas
         ref={canvasRef}
         onMouseMove={handleMouseMove}

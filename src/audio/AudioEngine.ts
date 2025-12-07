@@ -22,10 +22,27 @@ export class AudioEngine {
   private clockOffset = 0; // Offset from leader's clock in ms
   private latency = 0; // Measured network latency in ms
 
+  // Preview/audition synth (separate from main mix)
+  private previewSynth: Tone.PolySynth | null = null;
+  private previewPart: Tone.Part | null = null;
+  private isPreviewPlaying = false;
+
   constructor() {
     // Set up transport
     Tone.getTransport().bpm.value = 120;
     Tone.getTransport().timeSignature = this.beatsPerBar;
+
+    // Create preview synth with distinct sound (slightly different from main)
+    this.previewSynth = new Tone.PolySynth(Tone.Synth, {
+      oscillator: { type: 'sine' },
+      envelope: {
+        attack: 0.01,
+        decay: 0.1,
+        sustain: 0.4,
+        release: 0.5,
+      },
+    }).toDestination();
+    this.previewSynth.volume.value = -6; // Slightly quieter than main
   }
 
   async start(): Promise<void> {
@@ -298,7 +315,78 @@ export class AudioEngine {
     return loopBars.reduce(lcm);
   }
 
+  // === Preview/Audition Methods (DJ-style pre-listen) ===
+
+  // Preview a pattern before committing - plays once through with preview synth
+  previewPattern(pattern: NoteEvent[], bars: number): void {
+    // Stop any existing preview
+    this.stopPreview();
+
+    if (!this.previewSynth || pattern.length === 0) return;
+
+    // Create a one-shot preview part
+    type PartEvent = { time: string; note: NoteEvent };
+    const partEvents: PartEvent[] = pattern.map(n => ({
+      time: this.beatsToToneTime(n.time),
+      note: n
+    }));
+
+    const synth = this.previewSynth;
+    this.previewPart = new Tone.Part<PartEvent>((time, event) => {
+      synth.triggerAttackRelease(event.note.note, event.note.duration, time, event.note.velocity || 0.8);
+    }, partEvents);
+
+    // Loop once for preview
+    this.previewPart.loop = true;
+    this.previewPart.loopEnd = `${bars}m`;
+
+    // Start preview (uses transport time if playing, or immediate if stopped)
+    this.previewPart.start(0);
+    this.isPreviewPlaying = true;
+
+    // If transport isn't running, temporarily start it for preview
+    if (Tone.getTransport().state !== 'started') {
+      Tone.getTransport().start();
+      // Auto-stop after one loop cycle
+      const loopDurationMs = (bars * this.beatsPerBar * 60 * 1000) / this.getTempo();
+      setTimeout(() => {
+        if (this.isPreviewPlaying) {
+          this.stopPreview();
+          Tone.getTransport().stop();
+          Tone.getTransport().position = 0;
+        }
+      }, loopDurationMs + 100);
+    }
+  }
+
+  // Stop preview playback
+  stopPreview(): void {
+    if (this.previewPart) {
+      this.previewPart.stop();
+      this.previewPart.dispose();
+      this.previewPart = null;
+    }
+    this.isPreviewPlaying = false;
+  }
+
+  // Check if preview is currently playing
+  isPreviewActive(): boolean {
+    return this.isPreviewPlaying;
+  }
+
+  // Play a single note for auditioning (when clicking on timeline)
+  playPreviewNote(note: string, duration: string = '8n'): void {
+    if (this.previewSynth) {
+      this.previewSynth.triggerAttackRelease(note, duration);
+    }
+  }
+
   dispose(): void {
+    this.stopPreview();
+    if (this.previewSynth) {
+      this.previewSynth.dispose();
+      this.previewSynth = null;
+    }
     this.sequences.forEach((seq) => seq.dispose());
     this.synths.forEach((synth) => synth.dispose());
     this.sequences.clear();

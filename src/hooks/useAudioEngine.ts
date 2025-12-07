@@ -79,6 +79,23 @@ export function useAudioEngine() {
     audioEngine.updateLoopPattern(loopId, pattern);
   }, []);
 
+  // Preview pattern before committing (DJ-style pre-listen)
+  const previewPattern = useCallback(async (pattern: NoteEvent[], bars: number) => {
+    if (!isReady) {
+      await audioEngine.start();
+      setIsReady(true);
+    }
+    audioEngine.previewPattern(pattern, bars);
+  }, [isReady]);
+
+  const stopPreview = useCallback(() => {
+    audioEngine.stopPreview();
+  }, []);
+
+  const playPreviewNote = useCallback((note: string) => {
+    audioEngine.playPreviewNote(note);
+  }, []);
+
   return {
     isReady,
     isPlaying,
@@ -95,5 +112,8 @@ export function useAudioEngine() {
     getLoopPhase,
     calculateRealignment,
     updateLoopPattern,
+    previewPattern,
+    stopPreview,
+    playPreviewNote,
   };
 }

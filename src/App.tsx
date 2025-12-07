@@ -220,6 +220,9 @@ function App() {
             isPlaying={audio.isPlaying}
             tempo={audio.tempo}
             onPatternChange={handlePatternChange}
+            onPreviewPattern={audio.previewPattern}
+            onStopPreview={audio.stopPreview}
+            onPreviewNote={audio.playPreviewNote}
             editableLoopIds={currentPlayer?.loops.map(l => l.id)}
             queuedChanges={queuedChanges}
           />
