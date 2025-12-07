@@ -1,18 +1,25 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import { TimelineView } from './components/TimelineView';
 import { LoopPadGrid } from './components/LoopPad';
 import { SectionBar } from './components/SectionBar';
 import { TransportControls } from './components/TransportControls';
 import { RoomJoin, RoomShare } from './components/RoomJoin';
-import { PatternEditor } from './components/PatternEditor';
 import { useAudioEngine } from './hooks/useAudioEngine';
 import { useRoom } from './hooks/useRoom';
-import type { Loop, NoteEvent } from './types';
+import type { NoteEvent } from './types';
 import './App.css';
+
+// Queued pattern change
+interface QueuedPatternChange {
+  loopId: string;
+  pattern: NoteEvent[];
+  applyAtBar: number;
+}
 
 function App() {
   const [isInRoom, setIsInRoom] = useState(false);
-  const [editingLoop, setEditingLoop] = useState<Loop | null>(null);
+  const [queuedChanges, setQueuedChanges] = useState<QueuedPatternChange[]>([]);
+  const lastBarRef = useRef(0);
 
   const audio = useAudioEngine();
   const room = useRoom();
@@ -23,7 +30,6 @@ function App() {
     const roomParam = params.get('room');
     if (roomParam) {
       // Auto-prompt to join if room ID in URL
-      // For now, just show join screen with room pre-filled
     }
   }, []);
 
@@ -57,51 +63,74 @@ function App() {
     );
   }, [room.roomState]);
 
+  // Apply queued pattern changes when loop cycles
+  useEffect(() => {
+    if (queuedChanges.length === 0) return;
+    if (audio.currentBar === lastBarRef.current) return;
+
+    lastBarRef.current = audio.currentBar;
+
+    const changesToApply = queuedChanges.filter(change => {
+      const loop = room.currentPlayer?.loops.find(l => l.id === change.loopId);
+      if (!loop) return false;
+      // Check if we've reached or passed the apply bar
+      return audio.currentBar >= change.applyAtBar;
+    });
+
+    if (changesToApply.length > 0) {
+      changesToApply.forEach(change => {
+        audio.updateLoopPattern(change.loopId, change.pattern);
+      });
+
+      // Remove applied changes
+      setQueuedChanges(prev =>
+        prev.filter(c => !changesToApply.some(a => a.loopId === c.loopId))
+      );
+    }
+  }, [audio.currentBar, queuedChanges, room.currentPlayer, audio]);
+
   // Handle loop toggle with audio sync
   const handleLoopToggle = (loopId: string, active: boolean) => {
-    // Find the loop
     const player = room.currentPlayer;
     if (!player) return;
 
     const loop = player.loops.find((l) => l.id === loopId);
     if (!loop) return;
 
-    // Update audio engine
     audio.toggleLoop({ ...loop, muted: !active }, active);
-
-    // Sync to other devices
     room.triggerLoop(loopId, active);
   };
 
-  // Handle opening pattern editor
-  const handleEditPattern = (loopId: string) => {
+  // Handle pattern change - queue it for next loop cycle
+  const handlePatternChange = useCallback((loopId: string, pattern: NoteEvent[]) => {
     const player = room.currentPlayer;
     if (!player) return;
 
     const loop = player.loops.find((l) => l.id === loopId);
-    if (loop) {
-      setEditingLoop(loop);
-    }
-  };
+    if (!loop) return;
 
-  // Handle pattern change from editor
-  const handlePatternChange = (loopId: string, pattern: NoteEvent[]) => {
-    // Update audio engine with new pattern
-    audio.updateLoopPattern(loopId, pattern);
+    // Calculate when this loop will next restart
+    const currentBar = audio.currentBar;
+    const loopBars = loop.bars;
+    const nextLoopStart = Math.ceil((currentBar + 1) / loopBars) * loopBars;
 
-    // Sync to other devices
-    if (room.roomState) {
-      // TODO: Add updateLoopPattern to useRoom hook when SyncManager supports it
-      // For now, we'll just update locally
-    }
-  };
+    // Queue the change
+    setQueuedChanges(prev => {
+      // Replace any existing queued change for this loop
+      const filtered = prev.filter(c => c.loopId !== loopId);
+      return [...filtered, {
+        loopId,
+        pattern,
+        applyAtBar: nextLoopStart
+      }];
+    });
+  }, [room.currentPlayer, audio.currentBar]);
 
   // Show join screen if not in room
   if (!isInRoom) {
     return <RoomJoin onJoin={handleJoin} />;
   }
 
-  // Main app view
   const { roomState, currentPlayer } = room;
 
   if (!roomState || !currentPlayer) {
@@ -122,7 +151,8 @@ function App() {
       </header>
 
       <main className="app-main">
-        <div className="visualization-panel">
+        {/* Full-width timeline at top */}
+        <div className="timeline-section">
           <TimelineView
             loops={allLoops}
             currentBar={audio.currentBar}
@@ -131,72 +161,69 @@ function App() {
             tempo={audio.tempo}
             onPatternChange={handlePatternChange}
             editableLoopIds={currentPlayer?.loops.map(l => l.id)}
+            queuedChanges={queuedChanges}
           />
         </div>
 
-        <div className="controls-panel">
-          <SectionBar
-            sections={roomState.sections}
-            currentSectionIndex={roomState.currentSectionIndex}
-            nextSectionIndex={roomState.nextSectionIndex}
-            currentBar={audio.currentBar}
-            isLeader={isLeader}
-            onQueueSection={room.queueSection}
-            onChangeSection={room.changeSection}
-          />
-
-          <TransportControls
-            isPlaying={audio.isPlaying}
-            tempo={audio.tempo}
-            isLeader={isLeader}
-            onPlay={audio.start}
-            onStop={audio.stop}
-            onTempoChange={audio.changeTempo}
-          />
-
-          <div className="players-grid">
-            {roomState.players.map((player) => (
-              <LoopPadGrid
-                key={player.id}
-                loops={player.loops}
-                currentBar={audio.currentBar}
-                onToggle={
-                  player.id === currentPlayer.id
-                    ? handleLoopToggle
-                    : () => {} // Only current player can toggle their loops
-                }
-                onEdit={
-                  player.id === currentPlayer.id
-                    ? handleEditPattern
-                    : undefined // Only current player can edit their loops
-                }
-                playerName={
-                  player.id === currentPlayer.id
-                    ? `${player.name} (You)`
-                    : player.name
-                }
-                playerColor={player.color}
-              />
-            ))}
+        {/* Controls row */}
+        <div className="controls-row">
+          <div className="transport-section">
+            <TransportControls
+              isPlaying={audio.isPlaying}
+              tempo={audio.tempo}
+              isLeader={isLeader}
+              onPlay={audio.start}
+              onStop={audio.stop}
+              onTempoChange={audio.changeTempo}
+            />
           </div>
+
+          <div className="sections-container">
+            <SectionBar
+              sections={roomState.sections}
+              currentSectionIndex={roomState.currentSectionIndex}
+              nextSectionIndex={roomState.nextSectionIndex}
+              currentBar={audio.currentBar}
+              isLeader={isLeader}
+              onQueueSection={room.queueSection}
+              onChangeSection={room.changeSection}
+            />
+          </div>
+
+          <div className="edit-hint">
+            <span>Click on timeline to add/remove notes</span>
+            <span className="key">Changes apply on next loop cycle</span>
+          </div>
+        </div>
+
+        {/* Loop pads */}
+        <div className="loop-pads-section">
+          {roomState.players.map((player) => (
+            <LoopPadGrid
+              key={player.id}
+              loops={player.loops}
+              currentBar={audio.currentBar}
+              onToggle={
+                player.id === currentPlayer.id
+                  ? handleLoopToggle
+                  : () => {}
+              }
+              playerName={
+                player.id === currentPlayer.id
+                  ? `${player.name} (You)`
+                  : player.name
+              }
+              playerColor={player.color}
+            />
+          ))}
         </div>
       </main>
 
       <footer className="app-footer">
         <p>
-          Inspired by Philip Glass • Polymetric patterns meet collaborative
-          music-making
+          Inspired by Philip Glass • Polymetric patterns meet collaborative music-making
         </p>
       </footer>
-
-      {/* Pattern Editor Modal */}
-      {editingLoop && (
-        <PatternEditor
-          loop={editingLoop}
-          onPatternChange={handlePatternChange}
-          onClose={() => setEditingLoop(null)}
-        />
-      )}
     </div>
   );
 }

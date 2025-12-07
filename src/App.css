@@ -25,7 +25,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 24px;
+  padding: 12px 24px;
   background: rgba(26, 26, 46, 0.8);
   backdrop-filter: blur(10px);
   border-bottom: 1px solid #252542;
@@ -36,7 +36,7 @@ body {
 
 .app-header h1 {
   margin: 0;
-  font-size: 24px;
+  font-size: 20px;
   font-weight: 700;
   background: linear-gradient(135deg, #f472b6, #60a5fa);
   -webkit-background-clip: text;
@@ -46,70 +46,75 @@ body {
 
 .app-main {
   flex: 1;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 24px;
-  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
 }
 
-.visualization-panel {
+/* Timeline takes full width at the top */
+.timeline-section {
+  width: 100%;
   background: #0a0a0f;
-  border-radius: 16px;
-  overflow: hidden;
-  min-height: 400px;
+  border-radius: 12px;
   border: 1px solid #252542;
+  overflow: hidden;
+  height: 350px;
+  min-height: 300px;
+}
+
+/* Controls row below timeline */
+.controls-row {
   display: flex;
-  flex-direction: column;
-}
-
-/* View Toggle */
-.view-toggle {
-  display: flex;
-  gap: 2px;
-  padding: 8px;
-  background: #1a1a2e;
-  border-bottom: 1px solid #252542;
-}
-
-.view-toggle-btn {
-  flex: 1;
-  padding: 8px 16px;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  color: #666;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.view-toggle-btn:hover {
-  color: #888;
-  background: rgba(255, 255, 255, 0.05);
-}
-
-.view-toggle-btn.active {
-  background: #252542;
-  color: #fff;
-}
-
-.controls-panel {
-  display: flex;
-  flex-direction: column;
   gap: 16px;
+  flex-wrap: wrap;
 }
 
-.players-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+/* Transport and sections side by side */
+.transport-section {
+  flex: 0 0 auto;
+}
+
+.sections-container {
   flex: 1;
-  overflow-y: auto;
+  min-width: 200px;
+}
+
+/* Loop pads in a horizontal row */
+.loop-pads-section {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.loop-pads-section > * {
+  flex: 1;
+  min-width: 280px;
+  max-width: 400px;
+}
+
+/* Edit hint */
+.edit-hint {
+  background: rgba(96, 165, 250, 0.1);
+  border: 1px solid rgba(96, 165, 250, 0.3);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 11px;
+  color: #60a5fa;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.edit-hint .key {
+  background: rgba(96, 165, 250, 0.2);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: monospace;
 }
 
 .app-footer {
-  padding: 16px 24px;
+  padding: 12px 24px;
   text-align: center;
   background: rgba(26, 26, 46, 0.5);
   border-top: 1px solid #252542;
@@ -117,8 +122,8 @@ body {
 
 .app-footer p {
   margin: 0;
-  font-size: 12px;
-  color: #666;
+  font-size: 11px;
+  color: #555;
 }
 
 .loading {
@@ -131,47 +136,47 @@ body {
 }
 
 /* Responsive Design */
-@media (max-width: 1024px) {
-  .app-main {
-    grid-template-columns: 1fr;
-  }
-
-  .visualization-panel {
-    min-height: 300px;
-  }
-}
-
-@media (max-width: 600px) {
+@media (max-width: 768px) {
   .app-header {
     flex-direction: column;
-    gap: 12px;
-    padding: 12px 16px;
+    gap: 8px;
+    padding: 8px 12px;
   }
 
   .app-main {
-    padding: 12px;
-    gap: 12px;
+    padding: 8px;
+    gap: 8px;
   }
 
-  .visualization-panel {
+  .timeline-section {
+    height: 280px;
     min-height: 250px;
+  }
+
+  .controls-row {
+    flex-direction: column;
+  }
+
+  .loop-pads-section > * {
+    min-width: 100%;
+    max-width: 100%;
   }
 }
 
 /* Scrollbar styling */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
   background: #1a1a2e;
-  border-radius: 4px;
+  border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb {
   background: #333;
-  border-radius: 4px;
+  border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
