@@ -13,11 +13,37 @@ const DRUM_NOTES = {
   rim: 'B1',
 };
 
+// Note names for transposition
+const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+
+// Transpose a note string by semitones (e.g., "C4" + 2 = "D4")
+function transposeNote(note: string, semitones: number): string {
+  if (semitones === 0) return note;
+
+  const match = note.match(/^([A-G]#?)(\d)$/);
+  if (!match) return note;
+
+  const noteName = match[1];
+  const octave = parseInt(match[2]);
+
+  // Convert to MIDI-like pitch
+  const noteIndex = NOTE_NAMES.indexOf(noteName);
+  if (noteIndex === -1) return note;
+
+  const totalSemitones = octave * 12 + noteIndex + semitones;
+  const newOctave = Math.floor(totalSemitones / 12);
+  const newNoteIndex = ((totalSemitones % 12) + 12) % 12; // Handle negative
+
+  return `${NOTE_NAMES[newNoteIndex]}${newOctave}`;
+}
+
 export class AudioEngine {
   private synths: Map<string, Tone.PolySynth | Tone.MembraneSynth | Tone.NoiseSynth | Tone.MetalSynth> = new Map();
   private sequences: Map<string, Tone.Sequence> = new Map();
   private loopBars: Map<string, number> = new Map(); // Store loop bar lengths
   private loopInstruments: Map<string, InstrumentType> = new Map(); // Store loop instrument types
+  private loopTranspose: Map<string, number> = new Map(); // Store loop transpose (-12 to +12 semitones)
+  private loopMuted: Map<string, boolean> = new Map(); // Store loop muted state (for dynamic lookup in Part callback)
   private isStarted = false;
   private onBeatCallback?: (beat: number, bar: number) => void;
   private beatsPerBar = 4;
@@ -37,12 +63,12 @@ export class AudioEngine {
   // Fade state
   private isFading = false;
 
-  // Drum kit synths (shared)
-  private drumKit: {
+  // Per-loop drum kits (each drum loop gets its own kit to avoid timing conflicts)
+  private drumKits: Map<string, {
     kick: Tone.MembraneSynth;
     snare: Tone.NoiseSynth;
     hihat: Tone.MetalSynth;
-  } | null = null;
+  }> = new Map();
 
   constructor() {
     // Set up transport
@@ -64,14 +90,24 @@ export class AudioEngine {
       },
     }).toDestination();
     this.previewSynth.volume.value = -6; // Slightly quieter than main
-
-    // Initialize shared drum kit
-    this.initDrumKit();
   }
 
-  // Initialize shared drum kit synths
-  private initDrumKit(): void {
-    this.drumKit = {
+  // Create a drum kit for a specific loop
+  private createDrumKitForLoop(loopId: string): void {
+    // Also reinitialize master gain if needed
+    if (!this.masterGain || this.masterGain.disposed) {
+      this.masterGain = new Tone.Gain(1).toDestination();
+    }
+
+    // Clean up existing kit for this loop if any
+    const existingKit = this.drumKits.get(loopId);
+    if (existingKit) {
+      existingKit.kick.dispose();
+      existingKit.snare.dispose();
+      existingKit.hihat.dispose();
+    }
+
+    const drumKit = {
       // Kick drum - deep membrane
       kick: new Tone.MembraneSynth({
         pitchDecay: 0.05,
@@ -110,9 +146,11 @@ export class AudioEngine {
       }).connect(this.masterGain),
     };
 
-    this.drumKit.kick.volume.value = -6;
-    this.drumKit.snare.volume.value = -10;
-    this.drumKit.hihat.volume.value = -12;
+    drumKit.kick.volume.value = -6;
+    drumKit.snare.volume.value = -10;
+    drumKit.hihat.volume.value = -12;
+
+    this.drumKits.set(loopId, drumKit);
   }
 
   // Create synth based on instrument type
@@ -231,21 +269,27 @@ export class AudioEngine {
     return synth;
   }
 
-  // Play drum sound based on note
-  private playDrumNote(note: string, time: Tone.Unit.Time): void {
-    if (!this.drumKit) return;
+  // Play drum sound based on note (using per-loop drum kit)
+  private playDrumNote(loopId: string, note: string, time: Tone.Unit.Time): void {
+    // Get or create drum kit for this loop
+    let drumKit = this.drumKits.get(loopId);
+    if (!drumKit) {
+      this.createDrumKitForLoop(loopId);
+      drumKit = this.drumKits.get(loopId);
+    }
+    if (!drumKit) return;
 
     if (note === DRUM_NOTES.kick || note.includes('C1') || note.includes('C2')) {
-      this.drumKit.kick.triggerAttackRelease('C1', '8n', time);
+      drumKit.kick.triggerAttackRelease('C1', '8n', time);
     } else if (note === DRUM_NOTES.snare || note.includes('D1') || note.includes('D2')) {
-      this.drumKit.snare.triggerAttackRelease('8n', time);
+      drumKit.snare.triggerAttackRelease('8n', time);
     } else if (note === DRUM_NOTES.hihat || note.includes('E1') || note.includes('F1') || note.includes('E2')) {
-      this.drumKit.hihat.triggerAttackRelease('32n', time);
+      drumKit.hihat.triggerAttackRelease('32n', time);
     } else if (note === DRUM_NOTES.clap || note.includes('G1')) {
-      this.drumKit.snare.triggerAttackRelease('16n', time);
+      drumKit.snare.triggerAttackRelease('16n', time);
     } else {
       // Default to hi-hat for other notes
-      this.drumKit.hihat.triggerAttackRelease('32n', time);
+      drumKit.hihat.triggerAttackRelease('32n', time);
     }
   }
 
@@ -357,10 +401,18 @@ export class AudioEngine {
     };
   }
 
+  // Check if a loop exists
+  hasLoop(loopId: string): boolean {
+    return this.sequences.has(loopId);
+  }
+
   // Create a looping synth pattern for a loop
   createLoop(loop: Loop): void {
-    // Clean up existing
-    this.removeLoop(loop.id);
+    // If loop already exists, just update muted state - don't recreate
+    if (this.sequences.has(loop.id)) {
+      this.loopMuted.set(loop.id, loop.muted);
+      return;
+    }
 
     // Get instrument type (default to arpeggio for backwards compatibility)
     const instrument = loop.instrument || 'arpeggio';
@@ -370,9 +422,12 @@ export class AudioEngine {
     this.synths.set(loop.id, synth);
     this.loopBars.set(loop.id, loop.bars);
     this.loopInstruments.set(loop.id, instrument);
+    this.loopTranspose.set(loop.id, loop.transpose || 0);
+    this.loopMuted.set(loop.id, loop.muted); // Store initial muted state
 
     // Calculate the loop duration in bars
     const loopDuration = `${loop.bars}m`;
+    const loopId = loop.id;
 
     // Use the loop's actual pattern if it has one
     if (loop.pattern && loop.pattern.length > 0) {
@@ -386,12 +441,18 @@ export class AudioEngine {
       const isDrums = instrument === 'drums';
 
       const part = new Tone.Part<PartEvent>((time, event) => {
-        if (!loop.muted) {
+        // Look up muted state dynamically (not from closure)
+        const isMuted = this.loopMuted.get(loopId) ?? false;
+        if (!isMuted) {
+          // Get current transpose value (can change during playback)
+          const transpose = this.loopTranspose.get(loopId) || 0;
+          const playNote = isDrums ? event.note.note : transposeNote(event.note.note, transpose);
+
           if (isDrums) {
-            this.playDrumNote(event.note.note, time);
+            this.playDrumNote(loopId, playNote, time);
           } else {
             synth.triggerAttackRelease(
-              event.note.note,
+              playNote,
               event.note.duration,
               time,
               event.note.velocity || 0.8
@@ -407,17 +468,24 @@ export class AudioEngine {
   }
 
   startLoop(loopId: string): void {
+    // Unmute the loop so it plays
+    this.loopMuted.set(loopId, false);
     const sequence = this.sequences.get(loopId);
+
     if (sequence) {
-      sequence.start(0);
+      // Only start if not already started
+      if (sequence.state !== 'started') {
+        // Start at transport time 0 - all loops share the same timeline
+        sequence.start(0);
+      }
     }
   }
 
   stopLoop(loopId: string): void {
-    const sequence = this.sequences.get(loopId);
-    if (sequence) {
-      sequence.stop();
-    }
+    // Just mute the loop - don't stop it, so it stays in sync
+    this.loopMuted.set(loopId, true);
+    // We keep the sequence running but muted for sync
+    // The Part callback checks loopMuted dynamically
   }
 
   setLoopVolume(loopId: string, volume: number): void {
@@ -427,11 +495,17 @@ export class AudioEngine {
     }
   }
 
+  // Set transpose for a loop (-12 to +12 semitones)
+  setLoopTranspose(loopId: string, transpose: number): void {
+    // Clamp to valid range
+    const clampedTranspose = Math.max(-12, Math.min(12, transpose));
+    this.loopTranspose.set(loopId, clampedTranspose);
+    // No need to recreate sequence - transpose is applied in real-time during playback
+  }
+
   setLoopMuted(loopId: string, muted: boolean): void {
-    const synth = this.synths.get(loopId);
-    if (synth) {
-      synth.volume.value = muted ? -Infinity : 0;
-    }
+    // Update the muted state in the Map (used by Part callback)
+    this.loopMuted.set(loopId, muted);
   }
 
   removeLoop(loopId: string): void {
@@ -448,8 +522,19 @@ export class AudioEngine {
       this.synths.delete(loopId);
     }
 
+    // Clean up drum kit for this loop
+    const drumKit = this.drumKits.get(loopId);
+    if (drumKit) {
+      drumKit.kick.dispose();
+      drumKit.snare.dispose();
+      drumKit.hihat.dispose();
+      this.drumKits.delete(loopId);
+    }
+
     this.loopBars.delete(loopId);
     this.loopInstruments.delete(loopId);
+    this.loopTranspose.delete(loopId);
+    this.loopMuted.delete(loopId);
   }
 
   // Update a loop's pattern with new notes
@@ -473,17 +558,20 @@ export class AudioEngine {
         time: this.beatsToToneTime(n.time),
         note: n
       }));
-      console.log('[AudioEngine] updateLoopPattern notes:', partEvents.map(e => ({
-        time: e.time,
-        note: e.note.note,
-        duration: e.note.duration
-      })));
 
       const part = new Tone.Part<PartEvent>((time, event) => {
+        // Check muted state dynamically
+        const isMuted = this.loopMuted.get(loopId) ?? false;
+        if (isMuted) return;
+
+        // Get current transpose value (can change during playback)
+        const transpose = this.loopTranspose.get(loopId) || 0;
+        const playNote = isDrums ? event.note.note : transposeNote(event.note.note, transpose);
+
         if (isDrums) {
-          this.playDrumNote(event.note.note, time);
+          this.playDrumNote(loopId, playNote, time);
         } else {
-          synth.triggerAttackRelease(event.note.note, event.note.duration, time, event.note.velocity || 0.8);
+          synth.triggerAttackRelease(playNote, event.note.duration, time, event.note.velocity || 0.8);
         }
       }, partEvents);
 
@@ -609,12 +697,13 @@ export class AudioEngine {
       this.previewSynth.dispose();
       this.previewSynth = null;
     }
-    if (this.drumKit) {
-      this.drumKit.kick.dispose();
-      this.drumKit.snare.dispose();
-      this.drumKit.hihat.dispose();
-      this.drumKit = null;
-    }
+    // Dispose all per-loop drum kits
+    this.drumKits.forEach((kit) => {
+      kit.kick.dispose();
+      kit.snare.dispose();
+      kit.hihat.dispose();
+    });
+    this.drumKits.clear();
     if (this.masterGain) {
       this.masterGain.dispose();
     }

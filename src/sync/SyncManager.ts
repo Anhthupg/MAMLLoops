@@ -628,74 +628,74 @@ export const patternGenerators = {
 // Each row is an instrument type with all 8 bar lengths (1-8)
 const DEFAULT_LOOPS: Omit<Loop, 'id'>[] = [
   // DRUMS - all bar lengths (red)
-  { name: '1', bars: 1, color: INSTRUMENT_COLORS.drums, pattern: generateDrumPattern(1, 0), volume: 0.8, muted: true, instrument: 'drums', variation: 0 },
-  { name: '2', bars: 2, color: INSTRUMENT_COLORS.drums, pattern: generateDrumPattern(2, 0), volume: 0.8, muted: true, instrument: 'drums', variation: 0 },
-  { name: '3', bars: 3, color: INSTRUMENT_COLORS.drums, pattern: generateDrumPattern(3, 0), volume: 0.8, muted: true, instrument: 'drums', variation: 0 },
-  { name: '4', bars: 4, color: INSTRUMENT_COLORS.drums, pattern: generateDrumPattern(4, 0), volume: 0.8, muted: true, instrument: 'drums', variation: 0 },
-  { name: '5', bars: 5, color: INSTRUMENT_COLORS.drums, pattern: generateDrumPattern(5, 0), volume: 0.8, muted: true, instrument: 'drums', variation: 0 },
-  { name: '6', bars: 6, color: INSTRUMENT_COLORS.drums, pattern: generateDrumPattern(6, 0), volume: 0.8, muted: true, instrument: 'drums', variation: 0 },
-  { name: '7', bars: 7, color: INSTRUMENT_COLORS.drums, pattern: generateDrumPattern(7, 0), volume: 0.8, muted: true, instrument: 'drums', variation: 0 },
-  { name: '8', bars: 8, color: INSTRUMENT_COLORS.drums, pattern: generateDrumPattern(8, 0), volume: 0.8, muted: true, instrument: 'drums', variation: 0 },
+  { name: '1', bars: 1, color: INSTRUMENT_COLORS.drums, pattern: generateDrumPattern(1, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'drums', variation: 0 },
+  { name: '2', bars: 2, color: INSTRUMENT_COLORS.drums, pattern: generateDrumPattern(2, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'drums', variation: 0 },
+  { name: '3', bars: 3, color: INSTRUMENT_COLORS.drums, pattern: generateDrumPattern(3, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'drums', variation: 0 },
+  { name: '4', bars: 4, color: INSTRUMENT_COLORS.drums, pattern: generateDrumPattern(4, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'drums', variation: 0 },
+  { name: '5', bars: 5, color: INSTRUMENT_COLORS.drums, pattern: generateDrumPattern(5, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'drums', variation: 0 },
+  { name: '6', bars: 6, color: INSTRUMENT_COLORS.drums, pattern: generateDrumPattern(6, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'drums', variation: 0 },
+  { name: '7', bars: 7, color: INSTRUMENT_COLORS.drums, pattern: generateDrumPattern(7, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'drums', variation: 0 },
+  { name: '8', bars: 8, color: INSTRUMENT_COLORS.drums, pattern: generateDrumPattern(8, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'drums', variation: 0 },
 
   // BASS - all bar lengths (orange)
-  { name: '1', bars: 1, color: INSTRUMENT_COLORS.bass, pattern: generateBassPattern(1, 0), volume: 0.8, muted: true, instrument: 'bass', variation: 0 },
-  { name: '2', bars: 2, color: INSTRUMENT_COLORS.bass, pattern: generateBassPattern(2, 0), volume: 0.8, muted: true, instrument: 'bass', variation: 0 },
-  { name: '3', bars: 3, color: INSTRUMENT_COLORS.bass, pattern: generateBassPattern(3, 0), volume: 0.8, muted: true, instrument: 'bass', variation: 0 },
-  { name: '4', bars: 4, color: INSTRUMENT_COLORS.bass, pattern: generateBassPattern(4, 0), volume: 0.8, muted: true, instrument: 'bass', variation: 0 },
-  { name: '5', bars: 5, color: INSTRUMENT_COLORS.bass, pattern: generateBassPattern(5, 0), volume: 0.8, muted: true, instrument: 'bass', variation: 0 },
-  { name: '6', bars: 6, color: INSTRUMENT_COLORS.bass, pattern: generateBassPattern(6, 0), volume: 0.8, muted: true, instrument: 'bass', variation: 0 },
-  { name: '7', bars: 7, color: INSTRUMENT_COLORS.bass, pattern: generateBassPattern(7, 0), volume: 0.8, muted: true, instrument: 'bass', variation: 0 },
-  { name: '8', bars: 8, color: INSTRUMENT_COLORS.bass, pattern: generateBassPattern(8, 0), volume: 0.8, muted: true, instrument: 'bass', variation: 0 },
+  { name: '1', bars: 1, color: INSTRUMENT_COLORS.bass, pattern: generateBassPattern(1, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'bass', variation: 0 },
+  { name: '2', bars: 2, color: INSTRUMENT_COLORS.bass, pattern: generateBassPattern(2, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'bass', variation: 0 },
+  { name: '3', bars: 3, color: INSTRUMENT_COLORS.bass, pattern: generateBassPattern(3, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'bass', variation: 0 },
+  { name: '4', bars: 4, color: INSTRUMENT_COLORS.bass, pattern: generateBassPattern(4, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'bass', variation: 0 },
+  { name: '5', bars: 5, color: INSTRUMENT_COLORS.bass, pattern: generateBassPattern(5, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'bass', variation: 0 },
+  { name: '6', bars: 6, color: INSTRUMENT_COLORS.bass, pattern: generateBassPattern(6, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'bass', variation: 0 },
+  { name: '7', bars: 7, color: INSTRUMENT_COLORS.bass, pattern: generateBassPattern(7, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'bass', variation: 0 },
+  { name: '8', bars: 8, color: INSTRUMENT_COLORS.bass, pattern: generateBassPattern(8, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'bass', variation: 0 },
 
   // ARPEGGIO - all bar lengths (yellow)
-  { name: '1', bars: 1, color: INSTRUMENT_COLORS.arpeggio, pattern: generateArpeggioPattern(1, 0), volume: 0.8, muted: true, instrument: 'arpeggio', variation: 0 },
-  { name: '2', bars: 2, color: INSTRUMENT_COLORS.arpeggio, pattern: generateArpeggioPattern(2, 0), volume: 0.8, muted: true, instrument: 'arpeggio', variation: 0 },
-  { name: '3', bars: 3, color: INSTRUMENT_COLORS.arpeggio, pattern: generateArpeggioPattern(3, 0), volume: 0.8, muted: true, instrument: 'arpeggio', variation: 0 },
-  { name: '4', bars: 4, color: INSTRUMENT_COLORS.arpeggio, pattern: generateArpeggioPattern(4, 0), volume: 0.8, muted: true, instrument: 'arpeggio', variation: 0 },
-  { name: '5', bars: 5, color: INSTRUMENT_COLORS.arpeggio, pattern: generateArpeggioPattern(5, 0), volume: 0.8, muted: true, instrument: 'arpeggio', variation: 0 },
-  { name: '6', bars: 6, color: INSTRUMENT_COLORS.arpeggio, pattern: generateArpeggioPattern(6, 0), volume: 0.8, muted: true, instrument: 'arpeggio', variation: 0 },
-  { name: '7', bars: 7, color: INSTRUMENT_COLORS.arpeggio, pattern: generateArpeggioPattern(7, 0), volume: 0.8, muted: true, instrument: 'arpeggio', variation: 0 },
-  { name: '8', bars: 8, color: INSTRUMENT_COLORS.arpeggio, pattern: generateArpeggioPattern(8, 0), volume: 0.8, muted: true, instrument: 'arpeggio', variation: 0 },
+  { name: '1', bars: 1, color: INSTRUMENT_COLORS.arpeggio, pattern: generateArpeggioPattern(1, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'arpeggio', variation: 0 },
+  { name: '2', bars: 2, color: INSTRUMENT_COLORS.arpeggio, pattern: generateArpeggioPattern(2, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'arpeggio', variation: 0 },
+  { name: '3', bars: 3, color: INSTRUMENT_COLORS.arpeggio, pattern: generateArpeggioPattern(3, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'arpeggio', variation: 0 },
+  { name: '4', bars: 4, color: INSTRUMENT_COLORS.arpeggio, pattern: generateArpeggioPattern(4, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'arpeggio', variation: 0 },
+  { name: '5', bars: 5, color: INSTRUMENT_COLORS.arpeggio, pattern: generateArpeggioPattern(5, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'arpeggio', variation: 0 },
+  { name: '6', bars: 6, color: INSTRUMENT_COLORS.arpeggio, pattern: generateArpeggioPattern(6, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'arpeggio', variation: 0 },
+  { name: '7', bars: 7, color: INSTRUMENT_COLORS.arpeggio, pattern: generateArpeggioPattern(7, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'arpeggio', variation: 0 },
+  { name: '8', bars: 8, color: INSTRUMENT_COLORS.arpeggio, pattern: generateArpeggioPattern(8, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'arpeggio', variation: 0 },
 
   // CHORD - all bar lengths (green)
-  { name: '1', bars: 1, color: INSTRUMENT_COLORS.chord, pattern: generateChordPattern(1, 0), volume: 0.8, muted: true, instrument: 'chord', variation: 0 },
-  { name: '2', bars: 2, color: INSTRUMENT_COLORS.chord, pattern: generateChordPattern(2, 0), volume: 0.8, muted: true, instrument: 'chord', variation: 0 },
-  { name: '3', bars: 3, color: INSTRUMENT_COLORS.chord, pattern: generateChordPattern(3, 0), volume: 0.8, muted: true, instrument: 'chord', variation: 0 },
-  { name: '4', bars: 4, color: INSTRUMENT_COLORS.chord, pattern: generateChordPattern(4, 0), volume: 0.8, muted: true, instrument: 'chord', variation: 0 },
-  { name: '5', bars: 5, color: INSTRUMENT_COLORS.chord, pattern: generateChordPattern(5, 0), volume: 0.8, muted: true, instrument: 'chord', variation: 0 },
-  { name: '6', bars: 6, color: INSTRUMENT_COLORS.chord, pattern: generateChordPattern(6, 0), volume: 0.8, muted: true, instrument: 'chord', variation: 0 },
-  { name: '7', bars: 7, color: INSTRUMENT_COLORS.chord, pattern: generateChordPattern(7, 0), volume: 0.8, muted: true, instrument: 'chord', variation: 0 },
-  { name: '8', bars: 8, color: INSTRUMENT_COLORS.chord, pattern: generateChordPattern(8, 0), volume: 0.8, muted: true, instrument: 'chord', variation: 0 },
+  { name: '1', bars: 1, color: INSTRUMENT_COLORS.chord, pattern: generateChordPattern(1, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'chord', variation: 0 },
+  { name: '2', bars: 2, color: INSTRUMENT_COLORS.chord, pattern: generateChordPattern(2, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'chord', variation: 0 },
+  { name: '3', bars: 3, color: INSTRUMENT_COLORS.chord, pattern: generateChordPattern(3, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'chord', variation: 0 },
+  { name: '4', bars: 4, color: INSTRUMENT_COLORS.chord, pattern: generateChordPattern(4, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'chord', variation: 0 },
+  { name: '5', bars: 5, color: INSTRUMENT_COLORS.chord, pattern: generateChordPattern(5, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'chord', variation: 0 },
+  { name: '6', bars: 6, color: INSTRUMENT_COLORS.chord, pattern: generateChordPattern(6, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'chord', variation: 0 },
+  { name: '7', bars: 7, color: INSTRUMENT_COLORS.chord, pattern: generateChordPattern(7, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'chord', variation: 0 },
+  { name: '8', bars: 8, color: INSTRUMENT_COLORS.chord, pattern: generateChordPattern(8, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'chord', variation: 0 },
 
   // LEAD - all bar lengths (blue)
-  { name: '1', bars: 1, color: INSTRUMENT_COLORS.lead, pattern: generateLeadPattern(1, 0), volume: 0.8, muted: true, instrument: 'lead', variation: 0 },
-  { name: '2', bars: 2, color: INSTRUMENT_COLORS.lead, pattern: generateLeadPattern(2, 0), volume: 0.8, muted: true, instrument: 'lead', variation: 0 },
-  { name: '3', bars: 3, color: INSTRUMENT_COLORS.lead, pattern: generateLeadPattern(3, 0), volume: 0.8, muted: true, instrument: 'lead', variation: 0 },
-  { name: '4', bars: 4, color: INSTRUMENT_COLORS.lead, pattern: generateLeadPattern(4, 0), volume: 0.8, muted: true, instrument: 'lead', variation: 0 },
-  { name: '5', bars: 5, color: INSTRUMENT_COLORS.lead, pattern: generateLeadPattern(5, 0), volume: 0.8, muted: true, instrument: 'lead', variation: 0 },
-  { name: '6', bars: 6, color: INSTRUMENT_COLORS.lead, pattern: generateLeadPattern(6, 0), volume: 0.8, muted: true, instrument: 'lead', variation: 0 },
-  { name: '7', bars: 7, color: INSTRUMENT_COLORS.lead, pattern: generateLeadPattern(7, 0), volume: 0.8, muted: true, instrument: 'lead', variation: 0 },
-  { name: '8', bars: 8, color: INSTRUMENT_COLORS.lead, pattern: generateLeadPattern(8, 0), volume: 0.8, muted: true, instrument: 'lead', variation: 0 },
+  { name: '1', bars: 1, color: INSTRUMENT_COLORS.lead, pattern: generateLeadPattern(1, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'lead', variation: 0 },
+  { name: '2', bars: 2, color: INSTRUMENT_COLORS.lead, pattern: generateLeadPattern(2, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'lead', variation: 0 },
+  { name: '3', bars: 3, color: INSTRUMENT_COLORS.lead, pattern: generateLeadPattern(3, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'lead', variation: 0 },
+  { name: '4', bars: 4, color: INSTRUMENT_COLORS.lead, pattern: generateLeadPattern(4, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'lead', variation: 0 },
+  { name: '5', bars: 5, color: INSTRUMENT_COLORS.lead, pattern: generateLeadPattern(5, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'lead', variation: 0 },
+  { name: '6', bars: 6, color: INSTRUMENT_COLORS.lead, pattern: generateLeadPattern(6, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'lead', variation: 0 },
+  { name: '7', bars: 7, color: INSTRUMENT_COLORS.lead, pattern: generateLeadPattern(7, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'lead', variation: 0 },
+  { name: '8', bars: 8, color: INSTRUMENT_COLORS.lead, pattern: generateLeadPattern(8, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'lead', variation: 0 },
 
   // FX - all bar lengths (purple)
-  { name: '1', bars: 1, color: INSTRUMENT_COLORS.fx, pattern: generateFxPattern(1, 0), volume: 0.8, muted: true, instrument: 'fx', variation: 0 },
-  { name: '2', bars: 2, color: INSTRUMENT_COLORS.fx, pattern: generateFxPattern(2, 0), volume: 0.8, muted: true, instrument: 'fx', variation: 0 },
-  { name: '3', bars: 3, color: INSTRUMENT_COLORS.fx, pattern: generateFxPattern(3, 0), volume: 0.8, muted: true, instrument: 'fx', variation: 0 },
-  { name: '4', bars: 4, color: INSTRUMENT_COLORS.fx, pattern: generateFxPattern(4, 0), volume: 0.8, muted: true, instrument: 'fx', variation: 0 },
-  { name: '5', bars: 5, color: INSTRUMENT_COLORS.fx, pattern: generateFxPattern(5, 0), volume: 0.8, muted: true, instrument: 'fx', variation: 0 },
-  { name: '6', bars: 6, color: INSTRUMENT_COLORS.fx, pattern: generateFxPattern(6, 0), volume: 0.8, muted: true, instrument: 'fx', variation: 0 },
-  { name: '7', bars: 7, color: INSTRUMENT_COLORS.fx, pattern: generateFxPattern(7, 0), volume: 0.8, muted: true, instrument: 'fx', variation: 0 },
-  { name: '8', bars: 8, color: INSTRUMENT_COLORS.fx, pattern: generateFxPattern(8, 0), volume: 0.8, muted: true, instrument: 'fx', variation: 0 },
+  { name: '1', bars: 1, color: INSTRUMENT_COLORS.fx, pattern: generateFxPattern(1, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'fx', variation: 0 },
+  { name: '2', bars: 2, color: INSTRUMENT_COLORS.fx, pattern: generateFxPattern(2, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'fx', variation: 0 },
+  { name: '3', bars: 3, color: INSTRUMENT_COLORS.fx, pattern: generateFxPattern(3, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'fx', variation: 0 },
+  { name: '4', bars: 4, color: INSTRUMENT_COLORS.fx, pattern: generateFxPattern(4, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'fx', variation: 0 },
+  { name: '5', bars: 5, color: INSTRUMENT_COLORS.fx, pattern: generateFxPattern(5, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'fx', variation: 0 },
+  { name: '6', bars: 6, color: INSTRUMENT_COLORS.fx, pattern: generateFxPattern(6, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'fx', variation: 0 },
+  { name: '7', bars: 7, color: INSTRUMENT_COLORS.fx, pattern: generateFxPattern(7, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'fx', variation: 0 },
+  { name: '8', bars: 8, color: INSTRUMENT_COLORS.fx, pattern: generateFxPattern(8, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'fx', variation: 0 },
 
   // VOCAL - all bar lengths (pink)
-  { name: '1', bars: 1, color: INSTRUMENT_COLORS.vocal, pattern: generateVocalPattern(1, 0), volume: 0.8, muted: true, instrument: 'vocal', variation: 0 },
-  { name: '2', bars: 2, color: INSTRUMENT_COLORS.vocal, pattern: generateVocalPattern(2, 0), volume: 0.8, muted: true, instrument: 'vocal', variation: 0 },
-  { name: '3', bars: 3, color: INSTRUMENT_COLORS.vocal, pattern: generateVocalPattern(3, 0), volume: 0.8, muted: true, instrument: 'vocal', variation: 0 },
-  { name: '4', bars: 4, color: INSTRUMENT_COLORS.vocal, pattern: generateVocalPattern(4, 0), volume: 0.8, muted: true, instrument: 'vocal', variation: 0 },
-  { name: '5', bars: 5, color: INSTRUMENT_COLORS.vocal, pattern: generateVocalPattern(5, 0), volume: 0.8, muted: true, instrument: 'vocal', variation: 0 },
-  { name: '6', bars: 6, color: INSTRUMENT_COLORS.vocal, pattern: generateVocalPattern(6, 0), volume: 0.8, muted: true, instrument: 'vocal', variation: 0 },
-  { name: '7', bars: 7, color: INSTRUMENT_COLORS.vocal, pattern: generateVocalPattern(7, 0), volume: 0.8, muted: true, instrument: 'vocal', variation: 0 },
-  { name: '8', bars: 8, color: INSTRUMENT_COLORS.vocal, pattern: generateVocalPattern(8, 0), volume: 0.8, muted: true, instrument: 'vocal', variation: 0 },
+  { name: '1', bars: 1, color: INSTRUMENT_COLORS.vocal, pattern: generateVocalPattern(1, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'vocal', variation: 0 },
+  { name: '2', bars: 2, color: INSTRUMENT_COLORS.vocal, pattern: generateVocalPattern(2, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'vocal', variation: 0 },
+  { name: '3', bars: 3, color: INSTRUMENT_COLORS.vocal, pattern: generateVocalPattern(3, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'vocal', variation: 0 },
+  { name: '4', bars: 4, color: INSTRUMENT_COLORS.vocal, pattern: generateVocalPattern(4, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'vocal', variation: 0 },
+  { name: '5', bars: 5, color: INSTRUMENT_COLORS.vocal, pattern: generateVocalPattern(5, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'vocal', variation: 0 },
+  { name: '6', bars: 6, color: INSTRUMENT_COLORS.vocal, pattern: generateVocalPattern(6, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'vocal', variation: 0 },
+  { name: '7', bars: 7, color: INSTRUMENT_COLORS.vocal, pattern: generateVocalPattern(7, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'vocal', variation: 0 },
+  { name: '8', bars: 8, color: INSTRUMENT_COLORS.vocal, pattern: generateVocalPattern(8, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'vocal', variation: 0 },
 ];
 
 // Default sections
@@ -707,6 +707,17 @@ const DEFAULT_SECTIONS: Omit<Section, 'id'>[] = [
   { name: 'Bridge', loops: [], bars: 8, hasMemory: false },
   { name: 'Coda', loops: [], bars: 8, hasMemory: false },
 ];
+
+// All players get all 56 loops (7 instruments × 8 bar lengths)
+function getLoopsForPlayer(): Omit<Loop, 'id'>[] {
+  return DEFAULT_LOOPS;
+}
+
+// Calculate tracks per player for display
+export function getTracksPerPlayer(playerCount: number): { perPlayer: number; total: number } {
+  const perPlayer = DEFAULT_LOOPS.length;
+  return { perPlayer, total: perPlayer * playerCount };
+}
 
 export class SyncManager {
   private roomId: string;
@@ -782,11 +793,14 @@ export class SyncManager {
 
   // Join the room
   join(playerName: string, playerColor: string): Player {
+    // All players get all loops
+    const playerLoops = getLoopsForPlayer();
+
     const player: Player = {
       id: this.playerId,
       name: playerName,
       color: playerColor,
-      loops: DEFAULT_LOOPS.map((l) => ({ ...l, id: uuidv4() })),
+      loops: playerLoops.map((l) => ({ ...l, id: uuidv4() })),
       isReady: false,
     };
 
@@ -794,7 +808,7 @@ export class SyncManager {
     const delay = this.isHostFlag ? 100 : 2000;
 
     setTimeout(() => {
-      console.log('Sending join message for player:', player.name);
+      console.log('Sending join message for player:', player.name, 'with', player.loops.length, 'tracks');
       this.sync.send({ type: 'join', player });
     }, delay);
 
@@ -945,6 +959,15 @@ export class SyncManager {
     });
   }
 
+  updateLoopTranspose(loopId: string, transpose: number): void {
+    this.sync.send({
+      type: 'loop_transpose',
+      playerId: this.playerId,
+      loopId,
+      transpose,
+    });
+  }
+
   // Set player ready state
   setReady(ready: boolean): void {
     this.sync.send({ type: 'ready', playerId: this.playerId, ready });
@@ -1054,6 +1077,9 @@ export class SyncManager {
       case 'loop_volume':
         this.handleLoopVolume(message.playerId, message.loopId, message.volume);
         break;
+      case 'loop_transpose':
+        this.handleLoopTranspose(message.playerId, message.loopId, message.transpose);
+        break;
       case 'create_section_vote':
         this.handleCreateSectionVote(message.playerId, message.hasMemory, message.loopStateHash);
         break;
@@ -1155,6 +1181,23 @@ export class SyncManager {
     };
   }
 
+  private handleLoopTranspose(playerId: string, loopId: string, transpose: number): void {
+    this.state = {
+      ...this.state,
+      players: this.state.players.map((p) => {
+        if (p.id === playerId) {
+          return {
+            ...p,
+            loops: p.loops.map((l) =>
+              l.id === loopId ? { ...l, transpose } : l
+            ),
+          };
+        }
+        return p;
+      }),
+    };
+  }
+
   private handleCreateSectionVote(playerId: string, hasMemory: boolean, loopStateHash: string): void {
     // Update or add vote for this player
     const existingIndex = this.state.createSectionVotes.findIndex(v => v.playerId === playerId);
@@ -1235,7 +1278,10 @@ export class SyncManager {
   private handleJoin(player: Player): void {
     const exists = this.state.players.find((p) => p.id === player.id);
     if (!exists) {
-      console.log('Player joined:', player.name);
+      const newPlayerCount = this.state.players.length + 1;
+      console.log('Player joined:', player.name, '- total players now:', newPlayerCount);
+
+      // Simply add the new player - all players keep their own loops
       this.state = {
         ...this.state,
         players: [...this.state.players, player],
@@ -1252,15 +1298,19 @@ export class SyncManager {
   }
 
   private handleLeave(playerId: string): void {
+    const remainingPlayers = this.state.players.filter((p) => p.id !== playerId);
+
     this.state = {
       ...this.state,
-      players: this.state.players.filter((p) => p.id !== playerId),
+      players: remainingPlayers,
     };
 
     // If leader left, assign new leader
     if (this.state.leaderId === playerId && this.state.players.length > 0) {
       this.state.leaderId = this.state.players[0].id;
     }
+
+    console.log('Player left - remaining players:', remainingPlayers.length);
   }
 
   private handleLoopTrigger(playerId: string, loopId: string, active: boolean): void {

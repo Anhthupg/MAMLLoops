@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
+import { getTracksPerPlayer } from '../sync/SyncManager';
 import './RoomJoin.css';
 
 const PLAYER_COLORS = [
@@ -118,6 +119,7 @@ interface RoomShareProps {
 export function RoomShare({ roomId, playerCount, connectionStatus }: RoomShareProps) {
   const shareUrl = `${window.location.origin}${window.location.pathname}?room=${roomId}`;
   const [copied, setCopied] = useState(false);
+  const trackInfo = getTracksPerPlayer(playerCount);
 
   const copyLink = async () => {
     await navigator.clipboard.writeText(shareUrl);
@@ -130,6 +132,9 @@ export function RoomShare({ roomId, playerCount, connectionStatus }: RoomSharePr
       <div className="share-info">
         <span className="room-code">{roomId}</span>
         <span className="player-count">{playerCount} player{playerCount !== 1 ? 's' : ''}</span>
+        <span className="track-allocation" title={`${trackInfo.total} total tracks shared among all players`}>
+          {trackInfo.perPlayer} tracks/person
+        </span>
         {connectionStatus && (
           <span
             className={`connection-status ${connectionStatus.connected ? 'connected' : 'disconnected'}`}

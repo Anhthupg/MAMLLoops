@@ -23,6 +23,7 @@ interface TimelineViewProps {
   onPreviewNote?: (note: string) => void;
   onVariationChange?: (loopId: string, variation: number, newPattern: NoteEvent[]) => void;
   onVolumeChange?: (loopId: string, volume: number) => void;
+  onTransposeChange?: (loopId: string, transpose: number) => void;
   editableLoopIds?: string[];
   queuedChanges?: QueuedPatternChange[];
 }
@@ -89,6 +90,7 @@ export function TimelineView({
   onPreviewNote,
   onVariationChange,
   onVolumeChange,
+  onTransposeChange,
   editableLoopIds = [],
   queuedChanges = [],
 }: TimelineViewProps) {
@@ -756,23 +758,67 @@ export function TimelineView({
             {/* Vertical volume slider */}
             <input
               type="range"
+              className="slim-slider"
               min="0"
               max="2"
               step="0.05"
               value={loop.volume}
               onChange={(e) => onVolumeChange?.(loop.id, parseFloat(e.target.value))}
               style={{
-                width: 40,
-                height: 8,
-                accentColor: instrumentInfo?.color || '#3b82f6',
+                width: 36,
+                color: instrumentInfo?.color || '#3b82f6',
                 cursor: 'pointer',
                 transform: 'rotate(-90deg)',
                 transformOrigin: 'left center',
-                marginTop: 20,
-                marginLeft: 35,
+                marginTop: 18,
+                marginLeft: 30,
               }}
               title={`Volume: ${Math.round(loop.volume * 100)}%`}
             />
+
+            {/* Transpose slider */}
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              marginLeft: 4,
+              gap: 1,
+            }}>
+              <span style={{
+                fontSize: 7,
+                color: '#666',
+                fontWeight: 600,
+              }}>
+                T
+              </span>
+              <input
+                type="range"
+                className="slim-slider"
+                min="-12"
+                max="12"
+                step="1"
+                value={loop.transpose}
+                onChange={(e) => onTransposeChange?.(loop.id, parseInt(e.target.value))}
+                style={{
+                  width: 36,
+                  color: loop.transpose === 0 ? '#666' : loop.transpose > 0 ? '#4ade80' : '#f472b6',
+                  cursor: 'pointer',
+                  transform: 'rotate(-90deg)',
+                  transformOrigin: 'left center',
+                  marginTop: 18,
+                  marginLeft: 30,
+                }}
+                title={`Transpose: ${loop.transpose > 0 ? '+' : ''}${loop.transpose} semitones`}
+              />
+              <span style={{
+                fontSize: 8,
+                fontFamily: 'monospace',
+                color: loop.transpose === 0 ? '#666' : loop.transpose > 0 ? '#4ade80' : '#f472b6',
+                fontWeight: loop.transpose === 0 ? 'normal' : 'bold',
+              }}>
+                {loop.transpose === 0 ? '0' : loop.transpose > 0 ? `+${loop.transpose}` : loop.transpose}
+              </span>
+            </div>
           </div>
         );
       })}

@@ -53,12 +53,13 @@ export function useAudioEngine() {
 
   const toggleLoop = useCallback((loop: Loop, active: boolean) => {
     if (active) {
+      // createLoop will skip if already exists
       audioEngine.createLoop(loop);
       audioEngine.startLoop(loop.id);
       activeLoopsRef.current.add(loop.id);
     } else {
+      // stopLoop just mutes - keeps sequence running for sync
       audioEngine.stopLoop(loop.id);
-      activeLoopsRef.current.delete(loop.id);
     }
   }, []);
 
@@ -81,6 +82,10 @@ export function useAudioEngine() {
 
   const setLoopVolume = useCallback((loopId: string, volume: number) => {
     audioEngine.setLoopVolume(loopId, volume);
+  }, []);
+
+  const setLoopTranspose = useCallback((loopId: string, transpose: number) => {
+    audioEngine.setLoopTranspose(loopId, transpose);
   }, []);
 
   // Preview pattern before committing (DJ-style pre-listen)
@@ -117,6 +122,7 @@ export function useAudioEngine() {
     calculateRealignment,
     updateLoopPattern,
     setLoopVolume,
+    setLoopTranspose,
     previewPattern,
     stopPreview,
     playPreviewNote,

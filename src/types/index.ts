@@ -13,7 +13,8 @@ export interface Loop {
   bars: number; // Length in bars (4, 5, 8, etc. - Philip Glass style)
   color: string;
   pattern: NoteEvent[]; // Custom note pattern
-  volume: number; // 0-1
+  volume: number; // 0-2 (0x to 2x)
+  transpose: number; // -12 to +12 semitones
   muted: boolean;
   instrument: InstrumentType; // Sound type - determines synth and pattern style
   variation: number; // 0-4 (A-E) for different sample styles
@@ -132,6 +133,7 @@ export type SyncMessage =
   | { type: 'loop_trigger'; playerId: string; loopId: string; active: boolean }
   | { type: 'loop_update'; playerId: string; loopId: string; pattern: NoteEvent[] }
   | { type: 'loop_volume'; playerId: string; loopId: string; volume: number }
+  | { type: 'loop_transpose'; playerId: string; loopId: string; transpose: number }
   | { type: 'section_change'; sectionIndex: number }
   | { type: 'section_queue'; sectionIndex: number }
   | { type: 'section_vote'; playerId: string; sectionIndex: number }

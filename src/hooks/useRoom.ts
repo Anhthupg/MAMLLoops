@@ -105,6 +105,12 @@ export function useRoom() {
     }
   }, []);
 
+  const updateLoopTranspose = useCallback((loopId: string, transpose: number) => {
+    if (syncRef.current) {
+      syncRef.current.updateLoopTranspose(loopId, transpose);
+    }
+  }, []);
+
   const voteSection = useCallback((sectionIndex: number) => {
     if (syncRef.current) {
       syncRef.current.voteSection(sectionIndex);
@@ -197,6 +203,7 @@ export function useRoom() {
     triggerLoop,
     updateLoopPattern,
     updateLoopVolume,
+    updateLoopTranspose,
     voteSection,
     voteCreateSection,
     queueSection,

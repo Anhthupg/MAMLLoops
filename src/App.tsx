@@ -193,6 +193,14 @@ function App() {
     room.updateLoopVolume(loopId, volume);
   }, [audio, room]);
 
+  // Handle transpose change - update audio engine and sync to other devices
+  const handleTransposeChange = useCallback((loopId: string, transpose: number) => {
+    // Update local audio engine immediately
+    audio.setLoopTranspose(loopId, transpose);
+    // Sync transpose to other users
+    room.updateLoopTranspose(loopId, transpose);
+  }, [audio, room]);
+
   // Show join screen if not in room
   if (!isInRoom) {
     return <RoomJoin onJoin={handleJoin} />;
@@ -256,6 +264,7 @@ function App() {
             onPreviewNote={audio.playPreviewNote}
             onVariationChange={handleVariationChange}
             onVolumeChange={handleVolumeChange}
+            onTransposeChange={handleTransposeChange}
             editableLoopIds={currentPlayer?.loops.map(l => l.id)}
             queuedChanges={queuedChanges}
           />
