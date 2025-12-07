@@ -1,5 +1,5 @@
 import * as Tone from 'tone';
-import type { Loop, TransportState, ClockSync } from '../types';
+import type { Loop, TransportState, ClockSync, NoteEvent } from '../types';
 
 // Glass-inspired arpeggio patterns
 const ARPEGGIO_PATTERNS = {
@@ -189,6 +189,50 @@ export class AudioEngine {
       synth.dispose();
       this.synths.delete(loopId);
     }
+  }
+
+  // Update a loop's pattern with new notes
+  updateLoopPattern(loopId: string, pattern: NoteEvent[]): void {
+    const synth = this.synths.get(loopId);
+    const oldSequence = this.sequences.get(loopId);
+
+    if (!synth) return;
+
+    // Stop and dispose old sequence
+    if (oldSequence) {
+      const wasPlaying = oldSequence.state === 'started';
+      oldSequence.stop();
+      oldSequence.dispose();
+
+      // Create new sequence with the pattern
+      // Use a Part for precise timing based on pattern.time values
+      type PartEvent = { time: number; note: NoteEvent };
+      const partEvents: PartEvent[] = pattern.map(n => ({ time: n.time, note: n }));
+      const part = new Tone.Part<PartEvent>((time, event) => {
+        synth.triggerAttackRelease(event.note.note, event.note.duration, time, event.note.velocity || 0.8);
+      }, partEvents);
+
+      // Configure looping
+      const loopDuration = this.getLoopDurationFromPattern(pattern);
+      part.loop = true;
+      part.loopEnd = loopDuration;
+
+      this.sequences.set(loopId, part as unknown as Tone.Sequence);
+
+      // Restart if it was playing
+      if (wasPlaying) {
+        part.start(0);
+      }
+    }
+  }
+
+  // Estimate loop duration from pattern (find max time + some buffer)
+  private getLoopDurationFromPattern(pattern: NoteEvent[]): number {
+    if (pattern.length === 0) return 4; // Default 4 beats
+    const maxTime = Math.max(...pattern.map(n => n.time));
+    // Round up to next bar
+    const bars = Math.ceil((maxTime + 1) / 4);
+    return bars * 4; // beats
   }
 
   // Get current position within a specific loop (for visualization)

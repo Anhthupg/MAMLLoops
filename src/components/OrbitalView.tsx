@@ -1,5 +1,5 @@
 import { useRef, useEffect, useCallback } from 'react';
-import type { Loop } from '../types';
+import type { Loop, NoteEvent } from '../types';
 
 interface OrbitalViewProps {
   loops: Loop[];
@@ -7,6 +7,26 @@ interface OrbitalViewProps {
   isPlaying: boolean;
   tempo: number;
   realignmentBar: number;
+}
+
+// Convert note to pitch value (0-127, MIDI style)
+function noteToPitch(note: string): number {
+  const noteMap: Record<string, number> = {
+    'C': 0, 'C#': 1, 'D': 2, 'D#': 3, 'E': 4, 'F': 5,
+    'F#': 6, 'G': 7, 'G#': 8, 'A': 9, 'A#': 10, 'B': 11
+  };
+  const match = note.match(/^([A-G]#?)(\d)$/);
+  if (!match) return 60; // Default C4
+  const noteName = match[1];
+  const octave = parseInt(match[2]);
+  return (octave + 1) * 12 + noteMap[noteName];
+}
+
+// Normalize pitch to 0-1 range for visualization (C2=0, C6=1)
+function normalizePitch(pitch: number): number {
+  const minPitch = 36; // C2
+  const maxPitch = 84; // C6
+  return Math.max(0, Math.min(1, (pitch - minPitch) / (maxPitch - minPitch)));
 }
 
 // Calculate LCM of two numbers
@@ -151,6 +171,37 @@ export function OrbitalView({
           ctx.fill();
 
           ctx.restore();
+        }
+
+        // Draw note pattern visualization (dots on the ring showing pitch)
+        if (loop.pattern && loop.pattern.length > 0) {
+          const beatsPerBar = 4;
+
+          loop.pattern.forEach((note: NoteEvent) => {
+            // For each repetition of the loop within the cycle
+            for (let rep = 0; rep < cycleLength / loop.bars; rep++) {
+              const baseBar = rep * loop.bars;
+              const beatInCycle = baseBar * beatsPerBar + note.time;
+              const cyclePos = beatInCycle / (cycleLength * beatsPerBar);
+
+              const angle = cyclePos * Math.PI * 2 - Math.PI / 2;
+
+              // Use pitch to determine radial offset (higher = outer, lower = inner)
+              const pitch = noteToPitch(note.note);
+              const normalizedPitch = normalizePitch(pitch);
+              const pitchOffset = (normalizedPitch - 0.5) * 16; // -8 to +8 pixels
+
+              const noteRadius = radius + pitchOffset;
+              const noteX = centerX + Math.cos(angle) * noteRadius;
+              const noteY = centerY + Math.sin(angle) * noteRadius;
+
+              // Draw note dot
+              ctx.beginPath();
+              ctx.arc(noteX, noteY, isActive ? 3 : 2, 0, Math.PI * 2);
+              ctx.fillStyle = isActive ? '#fff' : '#666';
+              ctx.fill();
+            }
+          });
         }
 
         // Draw progress arc (how far through the cycle)

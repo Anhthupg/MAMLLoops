@@ -4,12 +4,15 @@ import { LoopPadGrid } from './components/LoopPad';
 import { SectionBar } from './components/SectionBar';
 import { TransportControls } from './components/TransportControls';
 import { RoomJoin, RoomShare } from './components/RoomJoin';
+import { PatternEditor } from './components/PatternEditor';
 import { useAudioEngine } from './hooks/useAudioEngine';
 import { useRoom } from './hooks/useRoom';
+import type { Loop, NoteEvent } from './types';
 import './App.css';
 
 function App() {
   const [isInRoom, setIsInRoom] = useState(false);
+  const [editingLoop, setEditingLoop] = useState<Loop | null>(null);
 
   const audio = useAudioEngine();
   const room = useRoom();
@@ -75,6 +78,29 @@ function App() {
 
     // Sync to other devices
     room.triggerLoop(loopId, active);
+  };
+
+  // Handle opening pattern editor
+  const handleEditPattern = (loopId: string) => {
+    const player = room.currentPlayer;
+    if (!player) return;
+
+    const loop = player.loops.find((l) => l.id === loopId);
+    if (loop) {
+      setEditingLoop(loop);
+    }
+  };
+
+  // Handle pattern change from editor
+  const handlePatternChange = (loopId: string, pattern: NoteEvent[]) => {
+    // Update audio engine with new pattern
+    audio.updateLoopPattern(loopId, pattern);
+
+    // Sync to other devices
+    if (room.roomState) {
+      // TODO: Add updateLoopPattern to useRoom hook when SyncManager supports it
+      // For now, we'll just update locally
+    }
   };
 
   // Show join screen if not in room
@@ -144,6 +170,11 @@ function App() {
                     ? handleLoopToggle
                     : () => {} // Only current player can toggle their loops
                 }
+                onEdit={
+                  player.id === currentPlayer.id
+                    ? handleEditPattern
+                    : undefined // Only current player can edit their loops
+                }
                 playerName={
                   player.id === currentPlayer.id
                     ? `${player.name} (You)`
@@ -162,6 +193,15 @@ function App() {
           music-making
         </p>
       </footer>
+
+      {/* Pattern Editor Modal */}
+      {editingLoop && (
+        <PatternEditor
+          loop={editingLoop}
+          onPatternChange={handlePatternChange}
+          onClose={() => setEditingLoop(null)}
+        />
+      )}
     </div>
   );
 }

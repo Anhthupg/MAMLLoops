@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { audioEngine } from '../audio/AudioEngine';
-import type { Loop } from '../types';
+import type { Loop, NoteEvent } from '../types';
 
 export function useAudioEngine() {
   const [isReady, setIsReady] = useState(false);
@@ -75,6 +75,10 @@ export function useAudioEngine() {
     return audioEngine.calculateRealignment(loopBars);
   }, []);
 
+  const updateLoopPattern = useCallback((loopId: string, pattern: NoteEvent[]) => {
+    audioEngine.updateLoopPattern(loopId, pattern);
+  }, []);
+
   return {
     isReady,
     isPlaying,
@@ -90,5 +94,6 @@ export function useAudioEngine() {
     removeLoop,
     getLoopPhase,
     calculateRealignment,
+    updateLoopPattern,
   };
 }
