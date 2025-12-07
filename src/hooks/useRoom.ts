@@ -99,6 +99,12 @@ export function useRoom() {
     }
   }, []);
 
+  const updateLoopVolume = useCallback((loopId: string, volume: number) => {
+    if (syncRef.current) {
+      syncRef.current.updateLoopVolume(loopId, volume);
+    }
+  }, []);
+
   const voteSection = useCallback((sectionIndex: number) => {
     if (syncRef.current) {
       syncRef.current.voteSection(sectionIndex);
@@ -190,6 +196,7 @@ export function useRoom() {
     leaveRoom,
     triggerLoop,
     updateLoopPattern,
+    updateLoopVolume,
     voteSection,
     voteCreateSection,
     queueSection,

@@ -43,17 +43,34 @@ function App() {
     setIsInRoom(true);
   };
 
-  // Sync transport state to other devices
+  // Sync transport state to other devices - use refs to avoid infinite loops
+  const lastSyncedTransportRef = useRef({ isPlaying: false, tempo: 120, bar: 0 });
+
   useEffect(() => {
-    if (room.isLeader() && room.roomState) {
-      room.updateTransport(
-        audio.isPlaying,
-        audio.tempo,
-        audio.currentBeat,
-        audio.currentBar
-      );
+    const isLeader = room.isLeader();
+    if (!isLeader || !room.roomState) return;
+
+    // Only sync if something actually changed
+    const last = lastSyncedTransportRef.current;
+    if (last.isPlaying === audio.isPlaying &&
+        last.tempo === audio.tempo &&
+        last.bar === audio.currentBar) {
+      return;
     }
-  }, [audio.isPlaying, audio.tempo, audio.currentBar, room]);
+
+    lastSyncedTransportRef.current = {
+      isPlaying: audio.isPlaying,
+      tempo: audio.tempo,
+      bar: audio.currentBar
+    };
+
+    room.updateTransport(
+      audio.isPlaying,
+      audio.tempo,
+      audio.currentBeat,
+      audio.currentBar
+    );
+  }, [audio.isPlaying, audio.tempo, audio.currentBar, audio.currentBeat, room]);
 
   // Get all active loops from all players
   const allLoops = useMemo(() => {
@@ -162,6 +179,20 @@ function App() {
     });
   }, [room.currentPlayer, audio.currentBar]);
 
+  // Handle variation change - queue the new pattern for next loop cycle
+  const handleVariationChange = useCallback((loopId: string, _variation: number, newPattern: NoteEvent[]) => {
+    // Use the same pattern change mechanism to queue the variation change
+    handlePatternChange(loopId, newPattern);
+  }, [handlePatternChange]);
+
+  // Handle volume change - update audio engine and sync to other devices
+  const handleVolumeChange = useCallback((loopId: string, volume: number) => {
+    // Update local audio engine immediately
+    audio.setLoopVolume(loopId, volume);
+    // Sync volume to other users
+    room.updateLoopVolume(loopId, volume);
+  }, [audio, room]);
+
   // Show join screen if not in room
   if (!isInRoom) {
     return <RoomJoin onJoin={handleJoin} />;
@@ -223,6 +254,8 @@ function App() {
             onPreviewPattern={audio.previewPattern}
             onStopPreview={audio.stopPreview}
             onPreviewNote={audio.playPreviewNote}
+            onVariationChange={handleVariationChange}
+            onVolumeChange={handleVolumeChange}
             editableLoopIds={currentPlayer?.loops.map(l => l.id)}
             queuedChanges={queuedChanges}
           />

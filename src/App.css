@@ -131,6 +131,108 @@ body {
   }
 }
 
+/* Phone Portrait Mode */
+@media (max-width: 480px) and (orientation: portrait) {
+  .app-header {
+    padding: 6px 8px;
+  }
+
+  .app-header h1 {
+    font-size: 16px;
+  }
+
+  .app-main {
+    padding: 4px;
+    gap: 4px;
+  }
+
+  /* Stack sections vertically in portrait */
+  .timeline-section {
+    min-height: 150px;
+    overflow-y: auto;
+  }
+
+  /* Make loop pads scroll horizontally */
+  .loop-pads-row {
+    flex-wrap: nowrap;
+    gap: 6px;
+    padding: 4px 0;
+  }
+
+  .toolbar-row {
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: center;
+  }
+
+  .app-footer {
+    padding: 8px;
+  }
+
+  .app-footer p {
+    font-size: 9px;
+  }
+}
+
+/* Phone Landscape Mode */
+@media (max-height: 500px) and (orientation: landscape) {
+  .app-header {
+    padding: 4px 12px;
+    flex-direction: row;
+  }
+
+  .app-header h1 {
+    font-size: 14px;
+  }
+
+  .app-main {
+    padding: 4px 8px;
+    gap: 4px;
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  /* Timeline takes most of the width */
+  .timeline-section {
+    flex: 2;
+    min-width: 60%;
+    min-height: 120px;
+    max-height: calc(100vh - 80px);
+  }
+
+  /* Loop pads on the side */
+  .loop-pads-row {
+    flex: 1;
+    flex-direction: column;
+    overflow-y: auto;
+    overflow-x: hidden;
+    max-height: calc(100vh - 80px);
+    gap: 4px;
+  }
+
+  .toolbar-row {
+    width: 100%;
+    gap: 6px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+  }
+
+  .app-footer {
+    display: none; /* Hide footer in landscape to save space */
+  }
+}
+
+/* Very small phones */
+@media (max-width: 360px) {
+  .app-header h1 {
+    font-size: 14px;
+  }
+
+  .app-main {
+    padding: 2px;
+  }
+}
+
 /* Scrollbar styling */
 ::-webkit-scrollbar {
   width: 6px;

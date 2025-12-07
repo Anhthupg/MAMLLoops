@@ -79,6 +79,10 @@ export function useAudioEngine() {
     audioEngine.updateLoopPattern(loopId, pattern);
   }, []);
 
+  const setLoopVolume = useCallback((loopId: string, volume: number) => {
+    audioEngine.setLoopVolume(loopId, volume);
+  }, []);
+
   // Preview pattern before committing (DJ-style pre-listen)
   const previewPattern = useCallback(async (pattern: NoteEvent[], bars: number) => {
     if (!isReady) {
@@ -112,6 +116,7 @@ export function useAudioEngine() {
     getLoopPhase,
     calculateRealignment,
     updateLoopPattern,
+    setLoopVolume,
     previewPattern,
     stopPreview,
     playPreviewNote,

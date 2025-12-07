@@ -16,7 +16,11 @@ export interface Loop {
   volume: number; // 0-1
   muted: boolean;
   instrument: InstrumentType; // Sound type - determines synth and pattern style
+  variation: number; // 0-4 (A-E) for different sample styles
 }
+
+// Variation labels for dropdown
+export const VARIATION_LABELS = ['A', 'B', 'C', 'D', 'E'] as const;
 
 // Incredibox-style instrument types for different musical registers
 export type InstrumentType =
@@ -127,6 +131,7 @@ export type SyncMessage =
   | { type: 'transport'; state: TransportState }
   | { type: 'loop_trigger'; playerId: string; loopId: string; active: boolean }
   | { type: 'loop_update'; playerId: string; loopId: string; pattern: NoteEvent[] }
+  | { type: 'loop_volume'; playerId: string; loopId: string; volume: number }
   | { type: 'section_change'; sectionIndex: number }
   | { type: 'section_queue'; sectionIndex: number }
   | { type: 'section_vote'; playerId: string; sectionIndex: number }

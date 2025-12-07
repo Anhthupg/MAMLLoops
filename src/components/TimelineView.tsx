@@ -1,6 +1,8 @@
 import { useRef, useEffect, useCallback, useState } from 'react';
 import * as Tone from 'tone';
-import type { Loop, NoteEvent } from '../types';
+import type { Loop, NoteEvent, InstrumentType } from '../types';
+import { VARIATION_LABELS, INSTRUMENT_INFO } from '../types';
+import { patternGenerators } from '../sync/SyncManager';
 
 // Queued pattern change type
 interface QueuedPatternChange {
@@ -19,13 +21,15 @@ interface TimelineViewProps {
   onPreviewPattern?: (pattern: NoteEvent[], bars: number) => void;
   onStopPreview?: () => void;
   onPreviewNote?: (note: string) => void;
+  onVariationChange?: (loopId: string, variation: number, newPattern: NoteEvent[]) => void;
+  onVolumeChange?: (loopId: string, volume: number) => void;
   editableLoopIds?: string[];
   queuedChanges?: QueuedPatternChange[];
 }
 
-// MIDI note range for display
-const MIN_PITCH = 36; // C2
-const MAX_PITCH = 84; // C6
+// MIDI note range for display (extended to include drum notes at C1/D1/E1)
+const MIN_PITCH = 24; // C1 (for drums)
+const MAX_PITCH = 96; // C7
 const PITCH_RANGE = MAX_PITCH - MIN_PITCH;
 
 // Note names for piano keys
@@ -83,6 +87,8 @@ export function TimelineView({
   onPreviewPattern,
   onStopPreview,
   onPreviewNote,
+  onVariationChange,
+  onVolumeChange,
   editableLoopIds = [],
   queuedChanges = [],
 }: TimelineViewProps) {
@@ -323,12 +329,15 @@ export function TimelineView({
           const isSeedLoop = rep === 0;
 
           patternToDraw.forEach((note: NoteEvent) => {
+            // note.time is in beats within the loop (0 to loopBeats)
+            // We need to place it at repStartBeat + note.time within the mother loop
             const noteBeatInMother = repStartBeat + note.time;
             if (noteBeatInMother >= motherLoopBeats) return;
 
             const pitch = noteToPitch(note.note);
             if (pitch < MIN_PITCH || pitch > MAX_PITCH) return;
 
+            // Calculate X position - note.time is relative to the loop, not the mother
             const noteX = trackLabelWidth + (noteBeatInMother / motherLoopBeats) * timelineWidth;
             const pitchNormalized = (pitch - MIN_PITCH) / PITCH_RANGE;
             const noteY = trackY + trackHeight * (1 - pitchNormalized) - 2;
@@ -602,9 +611,11 @@ export function TimelineView({
     };
   }, [draw]);
 
-  // Calculate track positions for preview buttons
+  // Calculate track positions for controls
+  // Fixed minimum track height ensures enough space for vertical volume slider
   const headerHeight = 40;
-  const trackHeight = loops.length > 0 ? (300 - headerHeight) / loops.length : 0;
+  const MIN_TRACK_HEIGHT = 70; // Fixed height per track for controls
+  const trackHeight = loops.length > 0 ? Math.max(MIN_TRACK_HEIGHT, (300 - headerHeight) / loops.length) : MIN_TRACK_HEIGHT;
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -643,42 +654,126 @@ export function TimelineView({
         ))}
       </div>
 
-      {/* Preview buttons overlay */}
+      {/* Track controls overlay - positioned in the track label area (left side) */}
       {loops.map((loop, index) => {
         const isEditable = editableLoopIds.includes(loop.id);
         const hasQueued = queuedChanges.some(c => c.loopId === loop.id);
         const isPreviewing = previewingLoopId === loop.id;
+        const instrumentInfo = INSTRUMENT_INFO[loop.instrument];
 
         if (!isEditable) return null;
 
+        const handleVariationSelect = (newVariation: number) => {
+          if (onVariationChange && loop.instrument) {
+            const generator = patternGenerators[loop.instrument as InstrumentType];
+            if (generator) {
+              const newPattern = generator(loop.bars, newVariation);
+              onVariationChange(loop.id, newVariation, newPattern);
+            }
+          }
+        };
+
+        // Calculate track position - controls go at BOTTOM of track label area
+        // Track label area: 80px wide, starts at headerHeight (40px)
+        // Text labels in canvas: name at +16, bars at +28, position at +40
+        // Controls should go below the text, at the bottom of the track
+        const trackTop = headerHeight + index * trackHeight;
+        const controlsTop = trackTop + 44; // Below the text labels
+
         return (
-          <button
-            key={`preview-${loop.id}`}
-            onClick={() => isPreviewing ? handleStopPreview() : handlePreview(loop.id)}
-            style={{
-              position: 'absolute',
-              left: 50,
-              top: headerHeight + index * trackHeight + trackHeight - 20,
-              width: 24,
-              height: 16,
-              background: isPreviewing ? '#f59e0b' : hasQueued ? '#3b82f6' : '#252542',
-              color: isPreviewing ? '#000' : '#fff',
-              border: 'none',
-              borderRadius: 3,
-              fontSize: 8,
-              fontFamily: 'monospace',
-              cursor: 'pointer',
-              zIndex: 10,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              opacity: loop.pattern.length > 0 || hasQueued ? 1 : 0.3,
-            }}
-            title={isPreviewing ? 'Stop preview' : 'Preview pattern (DJ pre-listen)'}
-            disabled={loop.pattern.length === 0 && !hasQueued}
-          >
-            {isPreviewing ? '■' : '▶'}
-          </button>
+          <div key={`controls-${loop.id}`} style={{
+            position: 'absolute',
+            left: 4,
+            top: controlsTop,
+            width: 72, // Fit within the 80px track label area
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 3,
+            zIndex: 10,
+          }}>
+            {/* Row 1: Variation dropdown + Preview + Volume label */}
+            <div style={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+              {/* Variation dropdown */}
+              <select
+                value={loop.variation ?? 0}
+                onChange={(e) => handleVariationSelect(parseInt(e.target.value))}
+                style={{
+                  width: 28,
+                  height: 16,
+                  background: '#1a1a2e',
+                  color: instrumentInfo?.color || '#fff',
+                  border: `1px solid ${instrumentInfo?.color || '#444'}`,
+                  borderRadius: 2,
+                  fontSize: 9,
+                  fontFamily: 'monospace',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  textAlign: 'center',
+                  padding: 0,
+                }}
+                title={`Pattern variation (${VARIATION_LABELS.join(', ')})`}
+              >
+                {VARIATION_LABELS.map((label, i) => (
+                  <option key={label} value={i}>{label}</option>
+                ))}
+              </select>
+
+              {/* Preview button */}
+              <button
+                onClick={() => isPreviewing ? handleStopPreview() : handlePreview(loop.id)}
+                style={{
+                  width: 16,
+                  height: 16,
+                  background: isPreviewing ? '#f59e0b' : hasQueued ? '#3b82f6' : '#252542',
+                  color: isPreviewing ? '#000' : '#fff',
+                  border: 'none',
+                  borderRadius: 2,
+                  fontSize: 7,
+                  fontFamily: 'monospace',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  opacity: loop.pattern.length > 0 || hasQueued ? 1 : 0.3,
+                }}
+                title={isPreviewing ? 'Stop preview' : 'Preview pattern'}
+                disabled={loop.pattern.length === 0 && !hasQueued}
+              >
+                {isPreviewing ? '■' : '▶'}
+              </button>
+
+              {/* Volume value */}
+              <span style={{
+                fontSize: 8,
+                fontFamily: 'monospace',
+                color: instrumentInfo?.color || '#666',
+                marginLeft: 2,
+              }}>
+                {loop.volume <= 0 ? '0' : loop.volume >= 2 ? '2x' : `${Math.round(loop.volume * 100)}%`}
+              </span>
+            </div>
+
+            {/* Vertical volume slider */}
+            <input
+              type="range"
+              min="0"
+              max="2"
+              step="0.05"
+              value={loop.volume}
+              onChange={(e) => onVolumeChange?.(loop.id, parseFloat(e.target.value))}
+              style={{
+                width: 40,
+                height: 8,
+                accentColor: instrumentInfo?.color || '#3b82f6',
+                cursor: 'pointer',
+                transform: 'rotate(-90deg)',
+                transformOrigin: 'left center',
+                marginTop: 20,
+                marginLeft: 35,
+              }}
+              title={`Volume: ${Math.round(loop.volume * 100)}%`}
+            />
+          </div>
         );
       })}
 
@@ -689,9 +784,8 @@ export function TimelineView({
         onClick={handleClick}
         style={{
           width: '100%',
-          height: '100%',
-          flex: 1,
-          minHeight: 0,
+          height: loops.length > 0 ? headerHeight + loops.length * MIN_TRACK_HEIGHT : 300,
+          minHeight: 300,
           display: 'block',
           background: '#0a0a0f',
           cursor: editableLoopIds.length > 0 ? 'crosshair' : 'default',

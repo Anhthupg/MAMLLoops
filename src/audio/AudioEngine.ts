@@ -22,6 +22,9 @@ export class AudioEngine {
   private onBeatCallback?: (beat: number, bar: number) => void;
   private beatsPerBar = 4;
 
+  // Master gain for fade in/out
+  private masterGain: Tone.Gain;
+
   // Clock sync state
   private clockOffset = 0; // Offset from leader's clock in ms
   private latency = 0; // Measured network latency in ms
@@ -30,6 +33,9 @@ export class AudioEngine {
   private previewSynth: Tone.PolySynth | null = null;
   private previewPart: Tone.Part | null = null;
   private isPreviewPlaying = false;
+
+  // Fade state
+  private isFading = false;
 
   // Drum kit synths (shared)
   private drumKit: {
@@ -43,7 +49,11 @@ export class AudioEngine {
     Tone.getTransport().bpm.value = 120;
     Tone.getTransport().timeSignature = this.beatsPerBar;
 
+    // Create master gain for fade in/out
+    this.masterGain = new Tone.Gain(1).toDestination();
+
     // Create preview synth with distinct sound (slightly different from main)
+    // Preview goes directly to destination (not through master gain) so it plays during fade
     this.previewSynth = new Tone.PolySynth(Tone.Synth, {
       oscillator: { type: 'sine' },
       envelope: {
@@ -73,7 +83,7 @@ export class AudioEngine {
           sustain: 0.01,
           release: 0.4,
         },
-      }).toDestination(),
+      }).connect(this.masterGain),
 
       // Snare - noise burst
       snare: new Tone.NoiseSynth({
@@ -84,7 +94,7 @@ export class AudioEngine {
           sustain: 0,
           release: 0.1,
         },
-      }).toDestination(),
+      }).connect(this.masterGain),
 
       // Hi-hat - metallic
       hihat: new Tone.MetalSynth({
@@ -97,7 +107,7 @@ export class AudioEngine {
         modulationIndex: 32,
         resonance: 4000,
         octaves: 1.5,
-      }).toDestination(),
+      }).connect(this.masterGain),
     };
 
     this.drumKit.kick.volume.value = -6;
@@ -116,7 +126,7 @@ export class AudioEngine {
         synth = new Tone.PolySynth(Tone.Synth, {
           oscillator: { type: 'sine' },
           envelope: { attack: 0.001, decay: 0.1, sustain: 0, release: 0.1 },
-        }).toDestination();
+        }).connect(this.masterGain);
         synth.volume.value = -Infinity; // Mute - we use drum kit instead
         break;
 
@@ -130,7 +140,7 @@ export class AudioEngine {
             sustain: 0.4,
             release: 0.3,
           },
-        }).toDestination();
+        }).connect(this.masterGain);
         synth.volume.value = Tone.gainToDb(volume) - 3;
         break;
 
@@ -144,7 +154,7 @@ export class AudioEngine {
             sustain: 0.7,
             release: 1.0,
           },
-        }).toDestination();
+        }).connect(this.masterGain);
         synth.volume.value = Tone.gainToDb(volume) - 6;
         break;
 
@@ -158,7 +168,7 @@ export class AudioEngine {
             sustain: 0.3,
             release: 0.8,
           },
-        }).toDestination();
+        }).connect(this.masterGain);
         synth.volume.value = Tone.gainToDb(volume);
         break;
 
@@ -172,7 +182,7 @@ export class AudioEngine {
             sustain: 0.5,
             release: 0.4,
           },
-        }).toDestination();
+        }).connect(this.masterGain);
         synth.volume.value = Tone.gainToDb(volume) - 3;
         break;
 
@@ -186,7 +196,7 @@ export class AudioEngine {
             sustain: 0.3,
             release: 2.0,
           },
-        }).toDestination();
+        }).connect(this.masterGain);
         synth.volume.value = Tone.gainToDb(volume) - 9;
         break;
 
@@ -200,7 +210,7 @@ export class AudioEngine {
             sustain: 0.6,
             release: 0.5,
           },
-        }).toDestination();
+        }).connect(this.masterGain);
         synth.volume.value = Tone.gainToDb(volume) - 3;
         break;
 
@@ -214,7 +224,7 @@ export class AudioEngine {
             sustain: 0.3,
             release: 0.8,
           },
-        }).toDestination();
+        }).connect(this.masterGain);
         synth.volume.value = Tone.gainToDb(volume);
     }
 
@@ -288,7 +298,36 @@ export class AudioEngine {
     }
   }
 
+  // Stop with fade-out over 2 beats
   stop(): void {
+    if (this.isFading) return; // Already fading
+
+    // Calculate fade duration: 2 beats at current tempo
+    const bpm = this.getTempo();
+    const fadeSeconds = (2 * 60) / bpm; // 2 beats in seconds
+
+    this.isFading = true;
+
+    // Ramp down master gain over 2 beats
+    const now = Tone.now();
+    this.masterGain.gain.setValueAtTime(1, now);
+    this.masterGain.gain.linearRampToValueAtTime(0, now + fadeSeconds);
+
+    // After fade completes, stop transport and reset
+    setTimeout(() => {
+      Tone.getTransport().stop();
+      Tone.getTransport().position = 0;
+      // Reset master gain for next play
+      this.masterGain.gain.setValueAtTime(1, Tone.now());
+      this.isFading = false;
+    }, fadeSeconds * 1000 + 50); // Add small buffer
+  }
+
+  // Immediate stop without fade (for dispose, etc.)
+  stopImmediate(): void {
+    this.isFading = false;
+    this.masterGain.gain.cancelScheduledValues(Tone.now());
+    this.masterGain.gain.setValueAtTime(1, Tone.now());
     Tone.getTransport().stop();
     Tone.getTransport().position = 0;
   }
@@ -565,6 +604,7 @@ export class AudioEngine {
 
   dispose(): void {
     this.stopPreview();
+    this.stopImmediate(); // Use immediate stop to avoid fade delay
     if (this.previewSynth) {
       this.previewSynth.dispose();
       this.previewSynth = null;
@@ -575,12 +615,14 @@ export class AudioEngine {
       this.drumKit.hihat.dispose();
       this.drumKit = null;
     }
+    if (this.masterGain) {
+      this.masterGain.dispose();
+    }
     this.sequences.forEach((seq) => seq.dispose());
     this.synths.forEach((synth) => synth.dispose());
     this.sequences.clear();
     this.synths.clear();
     this.loopInstruments.clear();
-    Tone.getTransport().stop();
     Tone.getTransport().cancel();
   }
 
