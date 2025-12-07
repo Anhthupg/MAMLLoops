@@ -146,6 +146,10 @@ function App() {
     const loopBars = loop.bars;
     const nextLoopStart = Math.ceil((currentBar + 1) / loopBars) * loopBars;
 
+    // Log the pattern for debugging
+    console.log('[App] Queueing pattern change for loop:', loopId, 'at bar:', nextLoopStart);
+    console.log('[App] Pattern notes:', pattern.map(n => ({ note: n.note, time: n.time, duration: n.duration })));
+
     // Queue the change
     setQueuedChanges(prev => {
       // Replace any existing queued change for this loop
@@ -183,7 +187,31 @@ function App() {
       </header>
 
       <main className="app-main">
-        {/* Full-width timeline at top */}
+        {/* Compact toolbar row */}
+        <div className="toolbar-row">
+          <TransportControls
+            isPlaying={audio.isPlaying}
+            tempo={audio.tempo}
+            isLeader={isLeader}
+            onPlay={audio.start}
+            onStop={audio.stop}
+            onTempoChange={audio.changeTempo}
+          />
+          <SectionBar
+            sections={roomState.sections}
+            currentSectionIndex={roomState.currentSectionIndex}
+            nextSectionIndex={roomState.nextSectionIndex}
+            sectionVotes={roomState.sectionVotes || []}
+            createSectionVotes={roomState.createSectionVotes || []}
+            playerCount={roomState.players.length}
+            currentBar={audio.currentBar}
+            myPlayerId={currentPlayer.id}
+            onVoteSection={room.voteSection}
+            onVoteCreateSection={room.voteCreateSection}
+          />
+        </div>
+
+        {/* Full-width timeline */}
         <div className="timeline-section">
           <TimelineView
             loops={allLoops}
@@ -197,39 +225,8 @@ function App() {
           />
         </div>
 
-        {/* Controls row */}
-        <div className="controls-row">
-          <div className="transport-section">
-            <TransportControls
-              isPlaying={audio.isPlaying}
-              tempo={audio.tempo}
-              isLeader={isLeader}
-              onPlay={audio.start}
-              onStop={audio.stop}
-              onTempoChange={audio.changeTempo}
-            />
-          </div>
-
-          <div className="sections-container">
-            <SectionBar
-              sections={roomState.sections}
-              currentSectionIndex={roomState.currentSectionIndex}
-              nextSectionIndex={roomState.nextSectionIndex}
-              currentBar={audio.currentBar}
-              isLeader={isLeader}
-              onQueueSection={room.queueSection}
-              onChangeSection={room.changeSection}
-            />
-          </div>
-
-          <div className="edit-hint">
-            <span>Click on timeline to add/remove notes</span>
-            <span className="key">Changes apply on next loop cycle</span>
-          </div>
-        </div>
-
-        {/* Loop pads */}
-        <div className="loop-pads-section">
+        {/* Compact loop pads row */}
+        <div className="loop-pads-row">
           {roomState.players.map((player) => (
             <LoopPadGrid
               key={player.id}

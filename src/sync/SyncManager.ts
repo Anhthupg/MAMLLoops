@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import Peer from 'peerjs';
-import type { RoomState, Player, SyncMessage, Loop, Section, NoteEvent } from '../types';
+import type { RoomState, Player, SyncMessage, Loop, Section, NoteEvent, LoopSnapshot } from '../types';
 
 type MessageHandler = (message: SyncMessage) => void;
 type ConnectionStatusHandler = (connected: boolean, peerCount: number) => void;
@@ -114,8 +114,11 @@ class PeerSync {
     });
 
     conn.on('data', (data: any) => {
-      console.log('📨 Received data:', data.type);
       const message = data as SyncMessage;
+      // Only log non-transport messages to avoid spam
+      if (message.type !== 'transport' && message.type !== 'clock_sync' && message.type !== 'ping' && message.type !== 'pong') {
+        console.log('📨 Received:', message.type);
+      }
 
       // Handle received message
       this.handlers.forEach((handler) => handler(message));
@@ -159,7 +162,10 @@ class PeerSync {
   }
 
   send(message: SyncMessage): void {
-    console.log('📤 Sending:', message.type);
+    // Only log non-transport messages to avoid spam
+    if (message.type !== 'transport' && message.type !== 'clock_sync' && message.type !== 'ping' && message.type !== 'pong') {
+      console.log('📤 Sending:', message.type);
+    }
 
     // Always handle locally first
     this.handlers.forEach((handler) => handler(message));
@@ -436,9 +442,12 @@ const DEFAULT_LOOPS: Omit<Loop, 'id'>[] = [
 
 // Default sections
 const DEFAULT_SECTIONS: Omit<Section, 'id'>[] = [
-  { name: 'A', loops: [], bars: 16 },
-  { name: 'B', loops: [], bars: 16 },
-  { name: 'Coda', loops: [], bars: 8 },
+  { name: 'Intro', loops: [], bars: 8, hasMemory: false },
+  { name: 'A', loops: [], bars: 16, hasMemory: false },
+  { name: 'B', loops: [], bars: 16, hasMemory: false },
+  { name: 'C', loops: [], bars: 16, hasMemory: false },
+  { name: 'Bridge', loops: [], bars: 8, hasMemory: false },
+  { name: 'Coda', loops: [], bars: 8, hasMemory: false },
 ];
 
 export class SyncManager {
@@ -467,6 +476,8 @@ export class SyncManager {
       sections: DEFAULT_SECTIONS.map((s) => ({ ...s, id: uuidv4() })),
       currentSectionIndex: 0,
       nextSectionIndex: null,
+      sectionVotes: [],
+      createSectionVotes: [],
       tempo: 120,
       currentBeat: 0,
       currentBar: 0,
@@ -548,7 +559,64 @@ export class SyncManager {
     });
   }
 
-  // Queue next section (leader only)
+  // Vote for next section (any player can vote)
+  voteSection(sectionIndex: number): void {
+    this.sync.send({
+      type: 'section_vote',
+      playerId: this.playerId,
+      sectionIndex,
+    });
+  }
+
+  // Vote to create a new section from current loop state
+  voteCreateSection(hasMemory: boolean): void {
+    const loopStateHash = this.computeLoopStateHash();
+    this.sync.send({
+      type: 'create_section_vote',
+      playerId: this.playerId,
+      hasMemory,
+      loopStateHash,
+    });
+  }
+
+  // Compute hash of current active loop state (for detecting changes)
+  private computeLoopStateHash(): string {
+    const activeLoops = this.state.players.flatMap(p =>
+      p.loops.filter(l => !l.muted).map(l => ({
+        id: l.id,
+        playerId: p.id,
+        patternHash: JSON.stringify(l.pattern).substring(0, 50) // Simple pattern fingerprint
+      }))
+    );
+    return JSON.stringify(activeLoops);
+  }
+
+  // Create snapshot of current loop states
+  private createLoopSnapshot(): LoopSnapshot[] {
+    return this.state.players.flatMap(p =>
+      p.loops.filter(l => !l.muted).map(l => ({
+        loopId: l.id,
+        playerId: p.id,
+        pattern: [...l.pattern],
+        muted: l.muted,
+      }))
+    );
+  }
+
+  // Generate next section name (e.g., "D", "E", or "A2" if A exists)
+  private generateNextSectionName(): string {
+    const existing = new Set(this.state.sections.map(s => s.name));
+    const letters = 'DEFGHIJ';
+    for (const letter of letters) {
+      if (!existing.has(letter)) return letter;
+    }
+    // If all letters used, add numbers
+    let num = 2;
+    while (existing.has(`A${num}`)) num++;
+    return `A${num}`;
+  }
+
+  // Queue next section (leader only, or triggered by majority vote)
   queueSection(sectionIndex: number): void {
     if (this.isLeader()) {
       this.sync.send({ type: 'section_queue', sectionIndex });
@@ -647,7 +715,10 @@ export class SyncManager {
   }
 
   private handleMessage(message: SyncMessage): void {
-    console.log('Handling message:', message.type);
+    // Only log non-transport messages to avoid spam
+    if (message.type !== 'transport' && message.type !== 'clock_sync') {
+      console.log('Handling message:', message.type);
+    }
 
     switch (message.type) {
       case 'join':
@@ -668,14 +739,18 @@ export class SyncManager {
       case 'loop_trigger':
         this.handleLoopTrigger(message.playerId, message.loopId, message.active);
         break;
+      case 'section_vote':
+        this.handleSectionVote(message.playerId, message.sectionIndex);
+        break;
       case 'section_queue':
-        this.state = { ...this.state, nextSectionIndex: message.sectionIndex };
+        this.state = { ...this.state, nextSectionIndex: message.sectionIndex, sectionVotes: [] };
         break;
       case 'section_change':
         this.state = {
           ...this.state,
           currentSectionIndex: message.sectionIndex,
           nextSectionIndex: null,
+          sectionVotes: [],
         };
         break;
       case 'state_sync':
@@ -709,17 +784,19 @@ export class SyncManager {
       case 'loop_update':
         this.handleLoopUpdate(message.playerId, message.loopId, message.pattern);
         break;
+      case 'create_section_vote':
+        this.handleCreateSectionVote(message.playerId, message.hasMemory, message.loopStateHash);
+        break;
+      case 'create_section_reset':
+        this.state = { ...this.state, createSectionVotes: [] };
+        break;
     }
 
     this.notifyListeners();
   }
 
   private handleClockSync(clock: { leaderTime: number; transportPosition: number; tempo: number }): void {
-    // Store clock offset for synchronization
-    const localTime = performance.now();
-    const clockOffset = localTime - clock.leaderTime;
-    console.log(`Clock sync: offset=${clockOffset.toFixed(2)}ms`);
-    // Notify audio engine via listeners
+    // Store clock offset for synchronization (no logging to avoid spam)
     this.clockSyncListeners.forEach(listener => listener(clock));
   }
 
@@ -727,9 +804,47 @@ export class SyncManager {
     const now = performance.now();
     const roundTrip = now - sendTime;
     const latency = roundTrip / 2;
-    console.log(`Latency: ${latency.toFixed(2)}ms (RTT: ${roundTrip.toFixed(2)}ms)`);
-    // Notify listeners about latency
+    // Notify listeners about latency (no logging to avoid spam)
     this.latencyListeners.forEach(listener => listener(latency));
+  }
+
+  private handleSectionVote(playerId: string, sectionIndex: number): void {
+    // Update or add vote for this player
+    const existingVoteIndex = this.state.sectionVotes.findIndex(v => v.playerId === playerId);
+    let newVotes = [...this.state.sectionVotes];
+
+    if (existingVoteIndex >= 0) {
+      // Update existing vote
+      newVotes[existingVoteIndex] = { playerId, sectionIndex };
+    } else {
+      // Add new vote
+      newVotes.push({ playerId, sectionIndex });
+    }
+
+    this.state = { ...this.state, sectionVotes: newVotes };
+
+    // Check if majority (>50%) voted for same section
+    const playerCount = this.state.players.length;
+    if (playerCount > 0) {
+      // Count votes for each section
+      const voteCounts = new Map<number, number>();
+      newVotes.forEach(v => {
+        voteCounts.set(v.sectionIndex, (voteCounts.get(v.sectionIndex) || 0) + 1);
+      });
+
+      // Find section with majority
+      for (const [section, count] of voteCounts) {
+        if (count > playerCount / 2) {
+          // Majority reached - queue the section change
+          this.state = {
+            ...this.state,
+            nextSectionIndex: section,
+            sectionVotes: [] // Clear votes after majority reached
+          };
+          break;
+        }
+      }
+    }
   }
 
   private handleLoopUpdate(playerId: string, loopId: string, pattern: NoteEvent[]): void {
@@ -746,6 +861,87 @@ export class SyncManager {
         }
         return p;
       }),
+    };
+
+    // Check if this pattern change invalidates create section votes
+    // If >50% of players made changes while voting, reset votes
+    this.checkCreateSectionVoteValidity();
+  }
+
+  private handleCreateSectionVote(playerId: string, hasMemory: boolean, loopStateHash: string): void {
+    // Update or add vote for this player
+    const existingIndex = this.state.createSectionVotes.findIndex(v => v.playerId === playerId);
+    let newVotes = [...this.state.createSectionVotes];
+
+    if (existingIndex >= 0) {
+      newVotes[existingIndex] = { playerId, hasMemory, loopStateHash };
+    } else {
+      newVotes.push({ playerId, hasMemory, loopStateHash });
+    }
+
+    this.state = { ...this.state, createSectionVotes: newVotes };
+
+    // Check if majority (>50%) voted with same hash
+    const playerCount = this.state.players.length;
+    if (playerCount > 0 && newVotes.length > playerCount / 2) {
+      // Count votes by hash (to ensure they all voted for the same loop state)
+      const hashCounts = new Map<string, { count: number; hasMemory: boolean }>();
+      newVotes.forEach(v => {
+        const existing = hashCounts.get(v.loopStateHash);
+        if (existing) {
+          existing.count++;
+          // Use hasMemory if any voter wants memory
+          existing.hasMemory = existing.hasMemory || v.hasMemory;
+        } else {
+          hashCounts.set(v.loopStateHash, { count: 1, hasMemory: v.hasMemory });
+        }
+      });
+
+      // Find hash with majority
+      for (const [, data] of hashCounts) {
+        if (data.count > playerCount / 2) {
+          // Majority reached with same loop state - create the section
+          this.createNewSection(data.hasMemory);
+          break;
+        }
+      }
+    }
+  }
+
+  private checkCreateSectionVoteValidity(): void {
+    if (this.state.createSectionVotes.length === 0) return;
+
+    const currentHash = this.computeLoopStateHash();
+    const playerCount = this.state.players.length;
+
+    // Count how many votes have mismatched hash (player changed their loops)
+    const mismatchCount = this.state.createSectionVotes.filter(
+      v => v.loopStateHash !== currentHash
+    ).length;
+
+    // If >50% of players changed their patterns, reset votes
+    if (mismatchCount > playerCount / 2) {
+      console.log('Create section votes reset: too many pattern changes');
+      this.sync.send({ type: 'create_section_reset', reason: 'pattern_changed' });
+    }
+  }
+
+  private createNewSection(hasMemory: boolean): void {
+    const newSection: Section = {
+      id: uuidv4(),
+      name: this.generateNextSectionName(),
+      loops: this.state.players.flatMap(p => p.loops.filter(l => !l.muted).map(l => l.id)),
+      bars: 16,
+      hasMemory,
+      snapshot: hasMemory ? this.createLoopSnapshot() : undefined,
+    };
+
+    console.log('Creating new section:', newSection.name, hasMemory ? 'with memory' : 'without memory');
+
+    this.state = {
+      ...this.state,
+      sections: [...this.state.sections, newSection],
+      createSectionVotes: [],
     };
   }
 

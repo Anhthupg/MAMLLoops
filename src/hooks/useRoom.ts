@@ -99,6 +99,18 @@ export function useRoom() {
     }
   }, []);
 
+  const voteSection = useCallback((sectionIndex: number) => {
+    if (syncRef.current) {
+      syncRef.current.voteSection(sectionIndex);
+    }
+  }, []);
+
+  const voteCreateSection = useCallback((hasMemory: boolean) => {
+    if (syncRef.current) {
+      syncRef.current.voteCreateSection(hasMemory);
+    }
+  }, []);
+
   const queueSection = useCallback((sectionIndex: number) => {
     if (syncRef.current) {
       syncRef.current.queueSection(sectionIndex);
@@ -178,6 +190,8 @@ export function useRoom() {
     leaveRoom,
     triggerLoop,
     updateLoopPattern,
+    voteSection,
+    voteCreateSection,
     queueSection,
     changeSection,
     updateTransport,

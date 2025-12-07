@@ -1,15 +1,15 @@
 .transport-controls {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
+  gap: 8px;
+  padding: 6px 10px;
   background: #1a1a2e;
-  border-radius: 12px;
+  border-radius: 8px;
 }
 
 .transport-button {
-  width: 48px;
-  height: 48px;
+  width: 36px;
+  height: 36px;
   border: none;
   border-radius: 50%;
   background: #252542;
@@ -22,8 +22,8 @@
 }
 
 .transport-button svg {
-  width: 20px;
-  height: 20px;
+  width: 16px;
+  height: 16px;
 }
 
 .transport-button:not(:disabled):hover {
@@ -37,8 +37,8 @@
 }
 
 .transport-button.play {
-  width: 56px;
-  height: 56px;
+  width: 40px;
+  height: 40px;
   background: #4ade80;
   color: #000;
 }
@@ -64,22 +64,22 @@
 .tempo-control {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-left: 16px;
-  padding-left: 16px;
+  gap: 8px;
+  margin-left: 8px;
+  padding-left: 8px;
   border-left: 1px solid #333;
 }
 
 .tempo-control label {
-  font-size: 11px;
+  font-size: 9px;
   color: #666;
   text-transform: uppercase;
-  letter-spacing: 1px;
+  letter-spacing: 0.5px;
 }
 
 .tempo-control input[type="range"] {
-  width: 120px;
-  height: 4px;
+  width: 80px;
+  height: 3px;
   appearance: none;
   background: #333;
   border-radius: 2px;
@@ -88,8 +88,8 @@
 
 .tempo-control input[type="range"]::-webkit-slider-thumb {
   appearance: none;
-  width: 16px;
-  height: 16px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
   background: #60a5fa;
   cursor: pointer;
@@ -101,50 +101,34 @@
 }
 
 .tempo-value {
-  font-size: 18px;
+  font-size: 14px;
   font-weight: 700;
   color: #fff;
   font-family: monospace;
-  min-width: 40px;
+  min-width: 32px;
 }
 
 .sync-indicator {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-left: auto;
-  font-size: 12px;
-  color: #4ade80;
-}
-
-.sync-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #4ade80;
-  animation: pulse-dot 2s ease-in-out infinite;
-}
-
-@keyframes pulse-dot {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+  display: none;
 }
 
 /* Responsive */
 @media (max-width: 600px) {
   .transport-controls {
-    flex-wrap: wrap;
-    justify-content: center;
+    padding: 4px 8px;
   }
 
-  .tempo-control {
-    margin-left: 0;
-    padding-left: 0;
-    border-left: none;
-    width: 100%;
-    justify-content: center;
-    margin-top: 8px;
-    padding-top: 12px;
-    border-top: 1px solid #333;
+  .transport-button {
+    width: 32px;
+    height: 32px;
+  }
+
+  .transport-button.play {
+    width: 36px;
+    height: 36px;
+  }
+
+  .tempo-control input[type="range"] {
+    width: 60px;
   }
 }

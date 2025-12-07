@@ -248,6 +248,22 @@ export function TimelineView({
       }
 
       // === GRID ===
+      // Draw subdivision grid lines (faint lines between beats)
+      if (subdivision.quantize > 1) {
+        ctx.strokeStyle = '#151520';
+        ctx.lineWidth = 0.3;
+        for (let beat = 0; beat < motherLoopBeats; beat++) {
+          for (let sub = 1; sub < subdivision.quantize; sub++) {
+            const subBeat = beat + (sub / subdivision.quantize);
+            const x = trackLabelWidth + (subBeat / motherLoopBeats) * timelineWidth;
+            ctx.beginPath();
+            ctx.moveTo(x, trackY);
+            ctx.lineTo(x, trackY + trackHeight);
+            ctx.stroke();
+          }
+        }
+      }
+
       // Draw beat grid lines
       for (let beat = 0; beat <= motherLoopBeats; beat++) {
         const x = trackLabelWidth + (beat / motherLoopBeats) * timelineWidth;
@@ -310,11 +326,15 @@ export function TimelineView({
             const pitchNormalized = (pitch - MIN_PITCH) / PITCH_RANGE;
             const noteY = trackY + trackHeight * (1 - pitchNormalized) - 2;
 
-            const durationBeats = note.duration === '8n' ? 0.5 :
+            const durationBeats = note.duration === '32n' ? 0.125 :
+                                  note.duration === '16n' ? 0.25 :
+                                  note.duration === '8n' ? 0.5 :
                                   note.duration === '4n' ? 1 :
                                   note.duration === '2n' ? 2 : 0.5;
-            const noteWidth = Math.max(3, (durationBeats / motherLoopBeats) * timelineWidth);
-            const noteHeight = Math.max(3, trackHeight / PITCH_RANGE * 0.7);
+            // Scale note width - use beat width as reference for better visibility
+            const beatWidth = timelineWidth / motherLoopBeats;
+            const noteWidth = Math.max(4, durationBeats * beatWidth);
+            const noteHeight = Math.max(4, trackHeight / PITCH_RANGE * 0.8);
 
             // Check if this note is new (in queued but not in current)
             const isNewNote = hasQueuedChange && !currentPattern.some(n =>
@@ -401,7 +421,7 @@ export function TimelineView({
     ctx.fillText('Click to add/remove notes • Orange = pending', trackLabelWidth + 5, height - 4);
 
     animationRef.current = requestAnimationFrame(draw);
-  }, [loops, isPlaying, tempo, motherLoopBars, motherLoopBeats, editableLoopIds, hoveredTrack, queuedChanges, getQueuedPattern, BEATS_PER_BAR]);
+  }, [loops, isPlaying, tempo, motherLoopBars, motherLoopBeats, editableLoopIds, hoveredTrack, queuedChanges, getQueuedPattern, BEATS_PER_BAR, subdivision]);
 
   // Mouse move for track hover
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -470,32 +490,50 @@ export function TimelineView({
     const pitchNormalized = 1 - (relativeY / trackHeight);
     const pitch = Math.round(MIN_PITCH + pitchNormalized * PITCH_RANGE);
     const clampedPitch = Math.max(MIN_PITCH, Math.min(MAX_PITCH, pitch));
-    const note = pitchToNote(clampedPitch);
+    const clickedNote = pitchToNote(clampedPitch);
 
     // Use queued pattern if exists, otherwise current pattern
     const queuedChange = getQueuedPattern(loop.id);
     const basePattern = queuedChange ? queuedChange.pattern : (loop.pattern || []);
 
     // Toggle note - look for existing note at this time/pitch
-    const timeTolerance = 0.3; // Slightly larger tolerance for easier clicking
-    const pitchTolerance = 4; // Allow some vertical tolerance
-    const existingIndex = basePattern.findIndex(n =>
-      Math.abs(n.time - quantizedBeat) < timeTolerance &&
-      Math.abs(noteToPitch(n.note) - clampedPitch) < pitchTolerance
-    );
+    // Use subdivision-based time tolerance (half of one grid unit)
+    const timeTolerance = (1 / subdivision.quantize) * 0.6;
+    const pitchTolerance = 6; // Allow some vertical tolerance (semitones)
+
+    const existingIndex = basePattern.findIndex(n => {
+      const noteTime = n.time;
+      const notePitch = noteToPitch(n.note);
+      const timeDiff = Math.abs(noteTime - quantizedBeat);
+      const pitchDiff = Math.abs(notePitch - clampedPitch);
+      return timeDiff < timeTolerance && pitchDiff < pitchTolerance;
+    });
+
+    console.log('Click:', {
+      quantizedBeat,
+      clickedNote,
+      clampedPitch,
+      existingIndex,
+      subdivisionValue: subdivision.value,
+      subdivisionBeats: subdivision.beats,
+      basePatternLength: basePattern.length
+    });
 
     let newPattern: NoteEvent[];
     if (existingIndex >= 0) {
       // Remove the existing note
+      console.log('Removing note at index', existingIndex, 'note:', basePattern[existingIndex]);
       newPattern = basePattern.filter((_, i) => i !== existingIndex);
     } else {
       // Add a new note with the selected subdivision's duration
-      newPattern = [...basePattern, {
-        note,
+      const newNote: NoteEvent = {
+        note: clickedNote,
         time: quantizedBeat,
         duration: subdivision.value,
         velocity: 0.8
-      }].sort((a, b) => a.time - b.time);
+      };
+      console.log('Adding note with duration:', subdivision.value, 'full note:', newNote);
+      newPattern = [...basePattern, newNote].sort((a, b) => a.time - b.time);
     }
 
     onPatternChange(loop.id, newPattern);

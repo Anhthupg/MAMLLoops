@@ -13,6 +13,7 @@ const ARPEGGIO_PATTERNS = {
 export class AudioEngine {
   private synths: Map<string, Tone.PolySynth> = new Map();
   private sequences: Map<string, Tone.Sequence> = new Map();
+  private loopBars: Map<string, number> = new Map(); // Store loop bar lengths
   private isStarted = false;
   private onBeatCallback?: (beat: number, bar: number) => void;
   private beatsPerBar = 4;
@@ -124,6 +125,7 @@ export class AudioEngine {
 
     synth.volume.value = Tone.gainToDb(loop.volume);
     this.synths.set(loop.id, synth);
+    this.loopBars.set(loop.id, loop.bars); // Store loop bar length
 
     // Calculate the loop duration in bars (use "Xm" notation for Tone.js)
     const loopDuration = `${loop.bars}m`;
@@ -214,6 +216,8 @@ export class AudioEngine {
       synth.dispose();
       this.synths.delete(loopId);
     }
+
+    this.loopBars.delete(loopId);
   }
 
   // Update a loop's pattern with new notes
@@ -236,14 +240,19 @@ export class AudioEngine {
         time: this.beatsToToneTime(n.time),
         note: n
       }));
+      console.log('[AudioEngine] updateLoopPattern notes:', partEvents.map(e => ({
+        time: e.time,
+        note: e.note.note,
+        duration: e.note.duration
+      })));
       const part = new Tone.Part<PartEvent>((time, event) => {
         synth.triggerAttackRelease(event.note.note, event.note.duration, time, event.note.velocity || 0.8);
       }, partEvents);
 
-      // Configure looping - use "Xm" notation for Tone.js
-      const loopBars = this.getLoopBarsFromPattern(pattern);
+      // Configure looping - use stored loop bars, NOT estimated from pattern
+      const bars = this.loopBars.get(loopId) || this.getLoopBarsFromPattern(pattern);
       part.loop = true;
-      part.loopEnd = `${loopBars}m`;
+      part.loopEnd = `${bars}m`;
 
       this.sequences.set(loopId, part as unknown as Tone.Sequence);
 

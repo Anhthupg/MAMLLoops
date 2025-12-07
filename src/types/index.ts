@@ -26,11 +26,33 @@ export interface Player {
   isReady: boolean;
 }
 
+// Snapshot of a loop's state for section memory
+export interface LoopSnapshot {
+  loopId: string;
+  playerId: string;
+  pattern: NoteEvent[];
+  muted: boolean;
+}
+
 export interface Section {
   id: string;
   name: string; // e.g., "A", "B", "Coda"
   loops: string[]; // Loop IDs active in this section
   bars: number; // How many bars before auto-advance (0 = manual)
+  hasMemory: boolean; // Whether this section saves loop states
+  snapshot?: LoopSnapshot[]; // Saved loop states (if hasMemory)
+}
+
+export interface SectionVote {
+  playerId: string;
+  sectionIndex: number;
+}
+
+// Vote to create a new section from current loop state
+export interface CreateSectionVote {
+  playerId: string;
+  hasMemory: boolean; // true = save loop patterns, false = just marker
+  loopStateHash: string; // Hash of current active loops when vote was cast
 }
 
 export interface RoomState {
@@ -39,6 +61,8 @@ export interface RoomState {
   sections: Section[];
   currentSectionIndex: number;
   nextSectionIndex: number | null;
+  sectionVotes: SectionVote[]; // Votes for next section
+  createSectionVotes: CreateSectionVote[]; // Votes to create new section
   tempo: number; // BPM
   currentBeat: number;
   currentBar: number;
@@ -84,6 +108,9 @@ export type SyncMessage =
   | { type: 'loop_update'; playerId: string; loopId: string; pattern: NoteEvent[] }
   | { type: 'section_change'; sectionIndex: number }
   | { type: 'section_queue'; sectionIndex: number }
+  | { type: 'section_vote'; playerId: string; sectionIndex: number }
+  | { type: 'create_section_vote'; playerId: string; hasMemory: boolean; loopStateHash: string }
+  | { type: 'create_section_reset'; reason: 'pattern_changed' }
   | { type: 'state_sync'; state: RoomState }
   | { type: 'ready'; playerId: string; ready: boolean }
   | { type: 'clock_sync'; clock: ClockSync }

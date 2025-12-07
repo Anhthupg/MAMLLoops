@@ -48,69 +48,43 @@ body {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding: 16px;
+  gap: 8px;
+  padding: 8px 16px;
 }
 
-/* Timeline takes full width at the top */
+/* Compact toolbar row */
+.toolbar-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* Timeline takes remaining space */
 .timeline-section {
   width: 100%;
   background: #0a0a0f;
-  border-radius: 12px;
+  border-radius: 8px;
   border: 1px solid #252542;
   overflow: hidden;
-  height: 350px;
-  min-height: 300px;
-}
-
-/* Controls row below timeline */
-.controls-row {
-  display: flex;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-
-/* Transport and sections side by side */
-.transport-section {
-  flex: 0 0 auto;
-}
-
-.sections-container {
   flex: 1;
-  min-width: 200px;
+  min-height: 200px;
 }
 
-/* Loop pads in a horizontal row */
-.loop-pads-section {
+/* Compact loop pads row */
+.loop-pads-row {
   display: flex;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-
-.loop-pads-section > * {
-  flex: 1;
-  min-width: 280px;
-  max-width: 400px;
-}
-
-/* Edit hint */
-.edit-hint {
-  background: rgba(96, 165, 250, 0.1);
-  border: 1px solid rgba(96, 165, 250, 0.3);
-  border-radius: 8px;
-  padding: 8px 12px;
-  font-size: 11px;
-  color: #60a5fa;
-  display: flex;
-  align-items: center;
   gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
 }
 
-.edit-hint .key {
-  background: rgba(96, 165, 250, 0.2);
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-family: monospace;
+.loop-pads-row::-webkit-scrollbar {
+  height: 4px;
+}
+
+.loop-pads-row > * {
+  flex: 0 0 auto;
 }
 
 .app-footer {
@@ -145,21 +119,15 @@ body {
 
   .app-main {
     padding: 8px;
+    gap: 6px;
+  }
+
+  .toolbar-row {
     gap: 8px;
   }
 
   .timeline-section {
-    height: 280px;
-    min-height: 250px;
-  }
-
-  .controls-row {
-    flex-direction: column;
-  }
-
-  .loop-pads-section > * {
-    min-width: 100%;
-    max-width: 100%;
+    min-height: 180px;
   }
 }
 
