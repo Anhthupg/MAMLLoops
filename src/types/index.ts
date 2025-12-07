@@ -15,8 +15,29 @@ export interface Loop {
   pattern: NoteEvent[]; // Custom note pattern
   volume: number; // 0-1
   muted: boolean;
-  instrument?: 'synth' | 'piano' | 'strings' | 'bass'; // Sound type
+  instrument: InstrumentType; // Sound type - determines synth and pattern style
 }
+
+// Incredibox-style instrument types for different musical registers
+export type InstrumentType =
+  | 'drums'     // Percussion/beats
+  | 'bass'      // Low-end bass lines
+  | 'chord'     // Chord stabs/pads
+  | 'arpeggio'  // Arpeggiated patterns (current Glass style)
+  | 'lead'      // Melody/lead lines
+  | 'fx'        // Effects/textures
+  | 'vocal';    // Vocal-like synth sounds
+
+// Instrument display info
+export const INSTRUMENT_INFO: Record<InstrumentType, { label: string; emoji: string; color: string }> = {
+  drums: { label: 'Drums', emoji: '🥁', color: '#ef4444' },
+  bass: { label: 'Bass', emoji: '🎸', color: '#f97316' },
+  chord: { label: 'Chord', emoji: '🎹', color: '#eab308' },
+  arpeggio: { label: 'Arp', emoji: '🎵', color: '#22c55e' },
+  lead: { label: 'Lead', emoji: '🎤', color: '#3b82f6' },
+  fx: { label: 'FX', emoji: '✨', color: '#8b5cf6' },
+  vocal: { label: 'Vocal', emoji: '🗣️', color: '#ec4899' },
+};
 
 export interface Player {
   id: string;

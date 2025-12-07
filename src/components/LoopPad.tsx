@@ -1,4 +1,5 @@
 import type { Loop } from '../types';
+import { INSTRUMENT_INFO } from '../types';
 import './LoopPad.css';
 
 interface LoopPadProps {
@@ -12,6 +13,9 @@ export function LoopPad({ loop, currentBar, onToggle, onEdit }: LoopPadProps) {
   const isActive = !loop.muted;
   const phase = (currentBar % loop.bars) / loop.bars;
   const currentLoopBar = (currentBar % loop.bars) + 1;
+
+  // Get instrument info
+  const instrumentInfo = INSTRUMENT_INFO[loop.instrument] || INSTRUMENT_INFO.arpeggio;
 
   const handleClick = (e: React.MouseEvent) => {
     // If shift-click or right-click, open editor
@@ -39,11 +43,13 @@ export function LoopPad({ loop, currentBar, onToggle, onEdit }: LoopPadProps) {
       } as React.CSSProperties}
       onClick={handleClick}
       onContextMenu={handleContextMenu}
+      title={`${loop.name} (${instrumentInfo.label}) - ${loop.bars} bar${loop.bars > 1 ? 's' : ''}`}
     >
       <div className="loop-pad-progress" />
-      <span className="loop-pad-label">{loop.bars}b</span>
+      <span className="loop-pad-emoji">{instrumentInfo.emoji}</span>
+      <span className="loop-pad-label">{loop.name}</span>
       <span className="loop-pad-status">
-        {isActive ? `${currentLoopBar}/${loop.bars}` : '—'}
+        {isActive ? `${currentLoopBar}/${loop.bars}` : `${loop.bars}b`}
       </span>
     </button>
   );

@@ -214,230 +214,204 @@ class PeerSync {
   }
 }
 
-// Glass-inspired default patterns
-// Each pattern fills its full loop length with 8th notes (2 notes per beat, 8 notes per bar)
+// =====================================
+// INCREDIBOX-STYLE INSTRUMENT PATTERNS
+// =====================================
+// Each loop has a different instrument type for a full musical mix
 
-// 1-bar loop = 4 beats = 8 eighth notes (C major arpeggio)
-const GLASS_PATTERN_1: NoteEvent[] = [
-  { note: 'C4', time: 0, duration: '8n' }, { note: 'E4', time: 0.5, duration: '8n' },
+// === DRUMS (1 bar) - Basic beat ===
+// C1=Kick, D1=Snare, E1=HiHat
+const DRUM_PATTERN: NoteEvent[] = [
+  // Beat 1: Kick
+  { note: 'C1', time: 0, duration: '8n' },
+  { note: 'E1', time: 0.5, duration: '16n' },
+  // Beat 2: HiHat
+  { note: 'E1', time: 1, duration: '16n' },
+  { note: 'E1', time: 1.5, duration: '16n' },
+  // Beat 3: Snare + Kick
+  { note: 'D1', time: 2, duration: '8n' },
+  { note: 'E1', time: 2.5, duration: '16n' },
+  // Beat 4: HiHat
+  { note: 'E1', time: 3, duration: '16n' },
+  { note: 'E1', time: 3.5, duration: '16n' },
+];
+
+// === BASS (2 bars) - Groove bass line ===
+const BASS_PATTERN: NoteEvent[] = [
+  // Bar 1
+  { note: 'C2', time: 0, duration: '4n' },
+  { note: 'C2', time: 1, duration: '8n' },
+  { note: 'G2', time: 1.5, duration: '8n' },
+  { note: 'C2', time: 2, duration: '4n' },
+  { note: 'Bb1', time: 3, duration: '8n' },
+  { note: 'C2', time: 3.5, duration: '8n' },
+  // Bar 2
+  { note: 'F2', time: 4, duration: '4n' },
+  { note: 'F2', time: 5, duration: '8n' },
+  { note: 'G2', time: 5.5, duration: '8n' },
+  { note: 'Ab2', time: 6, duration: '4n' },
+  { note: 'G2', time: 7, duration: '8n' },
+  { note: 'F2', time: 7.5, duration: '8n' },
+];
+
+// === CHORD (4 bars) - Pad chords ===
+const CHORD_PATTERN: NoteEvent[] = [
+  // Bar 1: Cm
+  { note: 'C4', time: 0, duration: '2n' },
+  { note: 'Eb4', time: 0, duration: '2n' },
+  { note: 'G4', time: 0, duration: '2n' },
+  { note: 'C4', time: 2, duration: '2n' },
+  { note: 'Eb4', time: 2, duration: '2n' },
+  { note: 'G4', time: 2, duration: '2n' },
+  // Bar 2: Fm
+  { note: 'F4', time: 4, duration: '2n' },
+  { note: 'Ab4', time: 4, duration: '2n' },
+  { note: 'C5', time: 4, duration: '2n' },
+  { note: 'F4', time: 6, duration: '2n' },
+  { note: 'Ab4', time: 6, duration: '2n' },
+  { note: 'C5', time: 6, duration: '2n' },
+  // Bar 3: Ab
+  { note: 'Ab4', time: 8, duration: '2n' },
+  { note: 'C5', time: 8, duration: '2n' },
+  { note: 'Eb5', time: 8, duration: '2n' },
+  { note: 'Ab4', time: 10, duration: '2n' },
+  { note: 'C5', time: 10, duration: '2n' },
+  { note: 'Eb5', time: 10, duration: '2n' },
+  // Bar 4: G
+  { note: 'G4', time: 12, duration: '2n' },
+  { note: 'B4', time: 12, duration: '2n' },
+  { note: 'D5', time: 12, duration: '2n' },
+  { note: 'G4', time: 14, duration: '2n' },
+  { note: 'B4', time: 14, duration: '2n' },
+  { note: 'D5', time: 14, duration: '2n' },
+];
+
+// === ARPEGGIO (3 bars) - Glass-style arpeggios ===
+const ARPEGGIO_PATTERN: NoteEvent[] = [
+  // Bar 1: Cm arpeggio
+  { note: 'C4', time: 0, duration: '8n' }, { note: 'Eb4', time: 0.5, duration: '8n' },
   { note: 'G4', time: 1, duration: '8n' }, { note: 'C5', time: 1.5, duration: '8n' },
-  { note: 'G4', time: 2, duration: '8n' }, { note: 'E4', time: 2.5, duration: '8n' },
+  { note: 'G4', time: 2, duration: '8n' }, { note: 'Eb4', time: 2.5, duration: '8n' },
   { note: 'C4', time: 3, duration: '8n' }, { note: 'G3', time: 3.5, duration: '8n' },
+  // Bar 2: Fm arpeggio
+  { note: 'F3', time: 4, duration: '8n' }, { note: 'Ab3', time: 4.5, duration: '8n' },
+  { note: 'C4', time: 5, duration: '8n' }, { note: 'F4', time: 5.5, duration: '8n' },
+  { note: 'C4', time: 6, duration: '8n' }, { note: 'Ab3', time: 6.5, duration: '8n' },
+  { note: 'F3', time: 7, duration: '8n' }, { note: 'C4', time: 7.5, duration: '8n' },
+  // Bar 3: G arpeggio
+  { note: 'G3', time: 8, duration: '8n' }, { note: 'B3', time: 8.5, duration: '8n' },
+  { note: 'D4', time: 9, duration: '8n' }, { note: 'G4', time: 9.5, duration: '8n' },
+  { note: 'D4', time: 10, duration: '8n' }, { note: 'B3', time: 10.5, duration: '8n' },
+  { note: 'G3', time: 11, duration: '8n' }, { note: 'D4', time: 11.5, duration: '8n' },
 ];
 
-// 2-bar loop = 8 beats = 16 eighth notes (G major)
-const GLASS_PATTERN_2: NoteEvent[] = [
-  // Bar 1
-  { note: 'G3', time: 0, duration: '8n' }, { note: 'B3', time: 0.5, duration: '8n' },
-  { note: 'D4', time: 1, duration: '8n' }, { note: 'G4', time: 1.5, duration: '8n' },
-  { note: 'B4', time: 2, duration: '8n' }, { note: 'D5', time: 2.5, duration: '8n' },
-  { note: 'B4', time: 3, duration: '8n' }, { note: 'G4', time: 3.5, duration: '8n' },
-  // Bar 2
-  { note: 'D4', time: 4, duration: '8n' }, { note: 'B3', time: 4.5, duration: '8n' },
-  { note: 'G3', time: 5, duration: '8n' }, { note: 'D4', time: 5.5, duration: '8n' },
-  { note: 'G4', time: 6, duration: '8n' }, { note: 'B4', time: 6.5, duration: '8n' },
-  { note: 'D5', time: 7, duration: '8n' }, { note: 'G5', time: 7.5, duration: '8n' },
+// === LEAD (5 bars) - Melody line ===
+const LEAD_PATTERN: NoteEvent[] = [
+  // Bar 1: Opening phrase
+  { note: 'G5', time: 0, duration: '4n' },
+  { note: 'Eb5', time: 1, duration: '8n' },
+  { note: 'F5', time: 1.5, duration: '8n' },
+  { note: 'G5', time: 2, duration: '2n' },
+  // Bar 2: Response
+  { note: 'C6', time: 4, duration: '4n' },
+  { note: 'Bb5', time: 5, duration: '8n' },
+  { note: 'Ab5', time: 5.5, duration: '8n' },
+  { note: 'G5', time: 6, duration: '2n' },
+  // Bar 3: Development
+  { note: 'F5', time: 8, duration: '4n' },
+  { note: 'G5', time: 9, duration: '8n' },
+  { note: 'Ab5', time: 9.5, duration: '8n' },
+  { note: 'Bb5', time: 10, duration: '4n' },
+  { note: 'C6', time: 11, duration: '4n' },
+  // Bar 4: Climax
+  { note: 'D6', time: 12, duration: '2n' },
+  { note: 'C6', time: 14, duration: '4n' },
+  { note: 'Bb5', time: 15, duration: '4n' },
+  // Bar 5: Resolution
+  { note: 'Ab5', time: 16, duration: '4n' },
+  { note: 'G5', time: 17, duration: '4n' },
+  { note: 'F5', time: 18, duration: '4n' },
+  { note: 'G5', time: 19, duration: '4n' },
 ];
 
-// 3-bar loop = 12 beats = 24 eighth notes (F major 7)
-const GLASS_PATTERN_3: NoteEvent[] = [
-  // Bar 1
-  { note: 'F3', time: 0, duration: '8n' }, { note: 'A3', time: 0.5, duration: '8n' },
-  { note: 'C4', time: 1, duration: '8n' }, { note: 'E4', time: 1.5, duration: '8n' },
-  { note: 'F4', time: 2, duration: '8n' }, { note: 'A4', time: 2.5, duration: '8n' },
-  { note: 'C5', time: 3, duration: '8n' }, { note: 'E5', time: 3.5, duration: '8n' },
-  // Bar 2
-  { note: 'F5', time: 4, duration: '8n' }, { note: 'E5', time: 4.5, duration: '8n' },
-  { note: 'C5', time: 5, duration: '8n' }, { note: 'A4', time: 5.5, duration: '8n' },
-  { note: 'F4', time: 6, duration: '8n' }, { note: 'E4', time: 6.5, duration: '8n' },
-  { note: 'C4', time: 7, duration: '8n' }, { note: 'A3', time: 7.5, duration: '8n' },
-  // Bar 3
-  { note: 'F3', time: 8, duration: '8n' }, { note: 'C4', time: 8.5, duration: '8n' },
-  { note: 'F4', time: 9, duration: '8n' }, { note: 'A4', time: 9.5, duration: '8n' },
-  { note: 'C5', time: 10, duration: '8n' }, { note: 'A4', time: 10.5, duration: '8n' },
-  { note: 'F4', time: 11, duration: '8n' }, { note: 'C4', time: 11.5, duration: '8n' },
+// === FX (7 bars) - Atmospheric texture ===
+const FX_PATTERN: NoteEvent[] = [
+  // Sparse, atmospheric hits
+  { note: 'C6', time: 0, duration: '1n' },
+  { note: 'G5', time: 4, duration: '2n' },
+  { note: 'Eb6', time: 8, duration: '1n' },
+  { note: 'Bb5', time: 12, duration: '2n' },
+  { note: 'F6', time: 16, duration: '1n' },
+  { note: 'C6', time: 20, duration: '2n' },
+  { note: 'G6', time: 24, duration: '2n' },
 ];
 
-// 4-bar loop = 16 beats = 32 eighth notes
-const GLASS_PATTERN_4: NoteEvent[] = [
-  // Bar 1
-  { note: 'C4', time: 0, duration: '8n' }, { note: 'E4', time: 0.5, duration: '8n' },
-  { note: 'G4', time: 1, duration: '8n' }, { note: 'B4', time: 1.5, duration: '8n' },
-  { note: 'C5', time: 2, duration: '8n' }, { note: 'B4', time: 2.5, duration: '8n' },
-  { note: 'G4', time: 3, duration: '8n' }, { note: 'E4', time: 3.5, duration: '8n' },
-  // Bar 2
-  { note: 'C4', time: 4, duration: '8n' }, { note: 'E4', time: 4.5, duration: '8n' },
-  { note: 'G4', time: 5, duration: '8n' }, { note: 'B4', time: 5.5, duration: '8n' },
-  { note: 'C5', time: 6, duration: '8n' }, { note: 'B4', time: 6.5, duration: '8n' },
-  { note: 'G4', time: 7, duration: '8n' }, { note: 'E4', time: 7.5, duration: '8n' },
-  // Bar 3
-  { note: 'C4', time: 8, duration: '8n' }, { note: 'E4', time: 8.5, duration: '8n' },
-  { note: 'G4', time: 9, duration: '8n' }, { note: 'B4', time: 9.5, duration: '8n' },
-  { note: 'C5', time: 10, duration: '8n' }, { note: 'B4', time: 10.5, duration: '8n' },
-  { note: 'G4', time: 11, duration: '8n' }, { note: 'E4', time: 11.5, duration: '8n' },
-  // Bar 4
-  { note: 'C4', time: 12, duration: '8n' }, { note: 'E4', time: 12.5, duration: '8n' },
-  { note: 'G4', time: 13, duration: '8n' }, { note: 'B4', time: 13.5, duration: '8n' },
-  { note: 'C5', time: 14, duration: '8n' }, { note: 'B4', time: 14.5, duration: '8n' },
-  { note: 'G4', time: 15, duration: '8n' }, { note: 'E4', time: 15.5, duration: '8n' },
+// === VOCAL (8 bars) - Human-like vocal synth ===
+const VOCAL_PATTERN: NoteEvent[] = [
+  // Bar 1-2: "Ooh"
+  { note: 'C5', time: 0, duration: '1n' },
+  { note: 'Eb5', time: 2, duration: '2n' },
+  { note: 'G5', time: 4, duration: '1n' },
+  // Bar 3-4: Response
+  { note: 'F5', time: 8, duration: '2n' },
+  { note: 'Eb5', time: 10, duration: '2n' },
+  { note: 'C5', time: 12, duration: '1n' },
+  // Bar 5-6: Build
+  { note: 'G5', time: 16, duration: '2n' },
+  { note: 'Ab5', time: 18, duration: '2n' },
+  { note: 'Bb5', time: 20, duration: '2n' },
+  { note: 'C6', time: 22, duration: '2n' },
+  // Bar 7-8: Resolution
+  { note: 'Bb5', time: 24, duration: '2n' },
+  { note: 'Ab5', time: 26, duration: '2n' },
+  { note: 'G5', time: 28, duration: '1n' },
 ];
 
-// 5-bar loop = 20 beats = 40 eighth notes
-const GLASS_PATTERN_5: NoteEvent[] = [
-  // Bar 1
-  { note: 'D4', time: 0, duration: '8n' }, { note: 'F#4', time: 0.5, duration: '8n' },
-  { note: 'A4', time: 1, duration: '8n' }, { note: 'C5', time: 1.5, duration: '8n' },
-  { note: 'E5', time: 2, duration: '8n' }, { note: 'C5', time: 2.5, duration: '8n' },
-  { note: 'A4', time: 3, duration: '8n' }, { note: 'F#4', time: 3.5, duration: '8n' },
-  // Bar 2
-  { note: 'D4', time: 4, duration: '8n' }, { note: 'A3', time: 4.5, duration: '8n' },
-  { note: 'D4', time: 5, duration: '8n' }, { note: 'F#4', time: 5.5, duration: '8n' },
-  { note: 'A4', time: 6, duration: '8n' }, { note: 'C5', time: 6.5, duration: '8n' },
-  { note: 'E5', time: 7, duration: '8n' }, { note: 'C5', time: 7.5, duration: '8n' },
-  // Bar 3
-  { note: 'A4', time: 8, duration: '8n' }, { note: 'F#4', time: 8.5, duration: '8n' },
-  { note: 'D4', time: 9, duration: '8n' }, { note: 'A3', time: 9.5, duration: '8n' },
-  { note: 'D4', time: 10, duration: '8n' }, { note: 'F#4', time: 10.5, duration: '8n' },
-  { note: 'A4', time: 11, duration: '8n' }, { note: 'C5', time: 11.5, duration: '8n' },
-  // Bar 4
-  { note: 'E5', time: 12, duration: '8n' }, { note: 'C5', time: 12.5, duration: '8n' },
-  { note: 'A4', time: 13, duration: '8n' }, { note: 'F#4', time: 13.5, duration: '8n' },
-  { note: 'D4', time: 14, duration: '8n' }, { note: 'A3', time: 14.5, duration: '8n' },
-  { note: 'D4', time: 15, duration: '8n' }, { note: 'F#4', time: 15.5, duration: '8n' },
-  // Bar 5
-  { note: 'A4', time: 16, duration: '8n' }, { note: 'C5', time: 16.5, duration: '8n' },
-  { note: 'E5', time: 17, duration: '8n' }, { note: 'C5', time: 17.5, duration: '8n' },
-  { note: 'A4', time: 18, duration: '8n' }, { note: 'F#4', time: 18.5, duration: '8n' },
-  { note: 'D4', time: 19, duration: '8n' }, { note: 'A3', time: 19.5, duration: '8n' },
+// === SECOND ARPEGGIO (6 bars) - Complementary pattern ===
+const ARPEGGIO_2_PATTERN: NoteEvent[] = [
+  // Bar 1: Ab arpeggio (higher register)
+  { note: 'Ab4', time: 0, duration: '8n' }, { note: 'C5', time: 0.5, duration: '8n' },
+  { note: 'Eb5', time: 1, duration: '8n' }, { note: 'Ab5', time: 1.5, duration: '8n' },
+  { note: 'Eb5', time: 2, duration: '8n' }, { note: 'C5', time: 2.5, duration: '8n' },
+  { note: 'Ab4', time: 3, duration: '8n' }, { note: 'Eb5', time: 3.5, duration: '8n' },
+  // Bar 2: Bb arpeggio
+  { note: 'Bb4', time: 4, duration: '8n' }, { note: 'D5', time: 4.5, duration: '8n' },
+  { note: 'F5', time: 5, duration: '8n' }, { note: 'Bb5', time: 5.5, duration: '8n' },
+  { note: 'F5', time: 6, duration: '8n' }, { note: 'D5', time: 6.5, duration: '8n' },
+  { note: 'Bb4', time: 7, duration: '8n' }, { note: 'F5', time: 7.5, duration: '8n' },
+  // Bar 3: Eb arpeggio
+  { note: 'Eb4', time: 8, duration: '8n' }, { note: 'G4', time: 8.5, duration: '8n' },
+  { note: 'Bb4', time: 9, duration: '8n' }, { note: 'Eb5', time: 9.5, duration: '8n' },
+  { note: 'Bb4', time: 10, duration: '8n' }, { note: 'G4', time: 10.5, duration: '8n' },
+  { note: 'Eb4', time: 11, duration: '8n' }, { note: 'Bb4', time: 11.5, duration: '8n' },
+  // Bar 4: F arpeggio
+  { note: 'F4', time: 12, duration: '8n' }, { note: 'A4', time: 12.5, duration: '8n' },
+  { note: 'C5', time: 13, duration: '8n' }, { note: 'F5', time: 13.5, duration: '8n' },
+  { note: 'C5', time: 14, duration: '8n' }, { note: 'A4', time: 14.5, duration: '8n' },
+  { note: 'F4', time: 15, duration: '8n' }, { note: 'C5', time: 15.5, duration: '8n' },
+  // Bar 5: G arpeggio
+  { note: 'G4', time: 16, duration: '8n' }, { note: 'B4', time: 16.5, duration: '8n' },
+  { note: 'D5', time: 17, duration: '8n' }, { note: 'G5', time: 17.5, duration: '8n' },
+  { note: 'D5', time: 18, duration: '8n' }, { note: 'B4', time: 18.5, duration: '8n' },
+  { note: 'G4', time: 19, duration: '8n' }, { note: 'D5', time: 19.5, duration: '8n' },
+  // Bar 6: Cm arpeggio (resolve)
+  { note: 'C4', time: 20, duration: '8n' }, { note: 'Eb4', time: 20.5, duration: '8n' },
+  { note: 'G4', time: 21, duration: '8n' }, { note: 'C5', time: 21.5, duration: '8n' },
+  { note: 'G4', time: 22, duration: '8n' }, { note: 'Eb4', time: 22.5, duration: '8n' },
+  { note: 'C4', time: 23, duration: '8n' }, { note: 'G4', time: 23.5, duration: '8n' },
 ];
 
-// 6-bar loop = 24 beats = 48 eighth notes (E minor)
-const GLASS_PATTERN_6: NoteEvent[] = [
-  // Bar 1
-  { note: 'E3', time: 0, duration: '8n' }, { note: 'G3', time: 0.5, duration: '8n' },
-  { note: 'B3', time: 1, duration: '8n' }, { note: 'E4', time: 1.5, duration: '8n' },
-  { note: 'G4', time: 2, duration: '8n' }, { note: 'B4', time: 2.5, duration: '8n' },
-  { note: 'E5', time: 3, duration: '8n' }, { note: 'B4', time: 3.5, duration: '8n' },
-  // Bar 2
-  { note: 'G4', time: 4, duration: '8n' }, { note: 'E4', time: 4.5, duration: '8n' },
-  { note: 'B3', time: 5, duration: '8n' }, { note: 'G3', time: 5.5, duration: '8n' },
-  { note: 'E3', time: 6, duration: '8n' }, { note: 'B3', time: 6.5, duration: '8n' },
-  { note: 'E4', time: 7, duration: '8n' }, { note: 'G4', time: 7.5, duration: '8n' },
-  // Bar 3
-  { note: 'B4', time: 8, duration: '8n' }, { note: 'E5', time: 8.5, duration: '8n' },
-  { note: 'G5', time: 9, duration: '8n' }, { note: 'E5', time: 9.5, duration: '8n' },
-  { note: 'B4', time: 10, duration: '8n' }, { note: 'G4', time: 10.5, duration: '8n' },
-  { note: 'E4', time: 11, duration: '8n' }, { note: 'B3', time: 11.5, duration: '8n' },
-  // Bar 4
-  { note: 'G3', time: 12, duration: '8n' }, { note: 'E3', time: 12.5, duration: '8n' },
-  { note: 'G3', time: 13, duration: '8n' }, { note: 'B3', time: 13.5, duration: '8n' },
-  { note: 'E4', time: 14, duration: '8n' }, { note: 'G4', time: 14.5, duration: '8n' },
-  { note: 'B4', time: 15, duration: '8n' }, { note: 'E5', time: 15.5, duration: '8n' },
-  // Bar 5
-  { note: 'G5', time: 16, duration: '8n' }, { note: 'B5', time: 16.5, duration: '8n' },
-  { note: 'G5', time: 17, duration: '8n' }, { note: 'E5', time: 17.5, duration: '8n' },
-  { note: 'B4', time: 18, duration: '8n' }, { note: 'G4', time: 18.5, duration: '8n' },
-  { note: 'E4', time: 19, duration: '8n' }, { note: 'B3', time: 19.5, duration: '8n' },
-  // Bar 6
-  { note: 'G3', time: 20, duration: '8n' }, { note: 'B3', time: 20.5, duration: '8n' },
-  { note: 'E4', time: 21, duration: '8n' }, { note: 'G4', time: 21.5, duration: '8n' },
-  { note: 'B4', time: 22, duration: '8n' }, { note: 'G4', time: 22.5, duration: '8n' },
-  { note: 'E4', time: 23, duration: '8n' }, { note: 'B3', time: 23.5, duration: '8n' },
-];
-
-// 7-bar loop = 28 beats = 56 eighth notes (Bb major)
-const GLASS_PATTERN_7: NoteEvent[] = [
-  // Bar 1
-  { note: 'Bb3', time: 0, duration: '8n' }, { note: 'D4', time: 0.5, duration: '8n' },
-  { note: 'F4', time: 1, duration: '8n' }, { note: 'Bb4', time: 1.5, duration: '8n' },
-  { note: 'D5', time: 2, duration: '8n' }, { note: 'F5', time: 2.5, duration: '8n' },
-  { note: 'D5', time: 3, duration: '8n' }, { note: 'Bb4', time: 3.5, duration: '8n' },
-  // Bar 2
-  { note: 'F4', time: 4, duration: '8n' }, { note: 'D4', time: 4.5, duration: '8n' },
-  { note: 'Bb3', time: 5, duration: '8n' }, { note: 'F3', time: 5.5, duration: '8n' },
-  { note: 'Bb3', time: 6, duration: '8n' }, { note: 'D4', time: 6.5, duration: '8n' },
-  { note: 'F4', time: 7, duration: '8n' }, { note: 'Bb4', time: 7.5, duration: '8n' },
-  // Bar 3
-  { note: 'D5', time: 8, duration: '8n' }, { note: 'Bb4', time: 8.5, duration: '8n' },
-  { note: 'F4', time: 9, duration: '8n' }, { note: 'D4', time: 9.5, duration: '8n' },
-  { note: 'Bb3', time: 10, duration: '8n' }, { note: 'D4', time: 10.5, duration: '8n' },
-  { note: 'F4', time: 11, duration: '8n' }, { note: 'Bb4', time: 11.5, duration: '8n' },
-  // Bar 4
-  { note: 'D5', time: 12, duration: '8n' }, { note: 'F5', time: 12.5, duration: '8n' },
-  { note: 'Bb5', time: 13, duration: '8n' }, { note: 'F5', time: 13.5, duration: '8n' },
-  { note: 'D5', time: 14, duration: '8n' }, { note: 'Bb4', time: 14.5, duration: '8n' },
-  { note: 'F4', time: 15, duration: '8n' }, { note: 'D4', time: 15.5, duration: '8n' },
-  // Bar 5
-  { note: 'Bb3', time: 16, duration: '8n' }, { note: 'F4', time: 16.5, duration: '8n' },
-  { note: 'Bb4', time: 17, duration: '8n' }, { note: 'D5', time: 17.5, duration: '8n' },
-  { note: 'F5', time: 18, duration: '8n' }, { note: 'D5', time: 18.5, duration: '8n' },
-  { note: 'Bb4', time: 19, duration: '8n' }, { note: 'F4', time: 19.5, duration: '8n' },
-  // Bar 6
-  { note: 'D4', time: 20, duration: '8n' }, { note: 'Bb3', time: 20.5, duration: '8n' },
-  { note: 'D4', time: 21, duration: '8n' }, { note: 'F4', time: 21.5, duration: '8n' },
-  { note: 'Bb4', time: 22, duration: '8n' }, { note: 'D5', time: 22.5, duration: '8n' },
-  { note: 'F5', time: 23, duration: '8n' }, { note: 'Bb5', time: 23.5, duration: '8n' },
-  // Bar 7
-  { note: 'F5', time: 24, duration: '8n' }, { note: 'D5', time: 24.5, duration: '8n' },
-  { note: 'Bb4', time: 25, duration: '8n' }, { note: 'F4', time: 25.5, duration: '8n' },
-  { note: 'D4', time: 26, duration: '8n' }, { note: 'Bb3', time: 26.5, duration: '8n' },
-  { note: 'F3', time: 27, duration: '8n' }, { note: 'Bb3', time: 27.5, duration: '8n' },
-];
-
-// 8-bar loop = 32 beats = 64 eighth notes
-const GLASS_PATTERN_8: NoteEvent[] = [
-  // Bar 1
-  { note: 'A3', time: 0, duration: '8n' }, { note: 'E4', time: 0.5, duration: '8n' },
-  { note: 'A4', time: 1, duration: '8n' }, { note: 'C5', time: 1.5, duration: '8n' },
-  { note: 'E5', time: 2, duration: '8n' }, { note: 'A5', time: 2.5, duration: '8n' },
-  { note: 'E5', time: 3, duration: '8n' }, { note: 'C5', time: 3.5, duration: '8n' },
-  // Bar 2
-  { note: 'A4', time: 4, duration: '8n' }, { note: 'E4', time: 4.5, duration: '8n' },
-  { note: 'C4', time: 5, duration: '8n' }, { note: 'E4', time: 5.5, duration: '8n' },
-  { note: 'A4', time: 6, duration: '8n' }, { note: 'C5', time: 6.5, duration: '8n' },
-  { note: 'E5', time: 7, duration: '8n' }, { note: 'A5', time: 7.5, duration: '8n' },
-  // Bar 3
-  { note: 'A3', time: 8, duration: '8n' }, { note: 'E4', time: 8.5, duration: '8n' },
-  { note: 'A4', time: 9, duration: '8n' }, { note: 'C5', time: 9.5, duration: '8n' },
-  { note: 'E5', time: 10, duration: '8n' }, { note: 'A5', time: 10.5, duration: '8n' },
-  { note: 'E5', time: 11, duration: '8n' }, { note: 'C5', time: 11.5, duration: '8n' },
-  // Bar 4
-  { note: 'A4', time: 12, duration: '8n' }, { note: 'E4', time: 12.5, duration: '8n' },
-  { note: 'C4', time: 13, duration: '8n' }, { note: 'E4', time: 13.5, duration: '8n' },
-  { note: 'A4', time: 14, duration: '8n' }, { note: 'C5', time: 14.5, duration: '8n' },
-  { note: 'E5', time: 15, duration: '8n' }, { note: 'A5', time: 15.5, duration: '8n' },
-  // Bar 5
-  { note: 'A3', time: 16, duration: '8n' }, { note: 'E4', time: 16.5, duration: '8n' },
-  { note: 'A4', time: 17, duration: '8n' }, { note: 'C5', time: 17.5, duration: '8n' },
-  { note: 'E5', time: 18, duration: '8n' }, { note: 'A5', time: 18.5, duration: '8n' },
-  { note: 'E5', time: 19, duration: '8n' }, { note: 'C5', time: 19.5, duration: '8n' },
-  // Bar 6
-  { note: 'A4', time: 20, duration: '8n' }, { note: 'E4', time: 20.5, duration: '8n' },
-  { note: 'C4', time: 21, duration: '8n' }, { note: 'E4', time: 21.5, duration: '8n' },
-  { note: 'A4', time: 22, duration: '8n' }, { note: 'C5', time: 22.5, duration: '8n' },
-  { note: 'E5', time: 23, duration: '8n' }, { note: 'A5', time: 23.5, duration: '8n' },
-  // Bar 7
-  { note: 'A3', time: 24, duration: '8n' }, { note: 'E4', time: 24.5, duration: '8n' },
-  { note: 'A4', time: 25, duration: '8n' }, { note: 'C5', time: 25.5, duration: '8n' },
-  { note: 'E5', time: 26, duration: '8n' }, { note: 'A5', time: 26.5, duration: '8n' },
-  { note: 'E5', time: 27, duration: '8n' }, { note: 'C5', time: 27.5, duration: '8n' },
-  // Bar 8
-  { note: 'A4', time: 28, duration: '8n' }, { note: 'E4', time: 28.5, duration: '8n' },
-  { note: 'C4', time: 29, duration: '8n' }, { note: 'E4', time: 29.5, duration: '8n' },
-  { note: 'A4', time: 30, duration: '8n' }, { note: 'C5', time: 30.5, duration: '8n' },
-  { note: 'E5', time: 31, duration: '8n' }, { note: 'A5', time: 31.5, duration: '8n' },
-];
-
-// Default loops for new players - 8 loops with different bar lengths
+// Default loops for new players - Incredibox-style variety
+// Each loop has a different instrument to cover all musical registers
 const DEFAULT_LOOPS: Omit<Loop, 'id'>[] = [
-  { name: '1 Bar', bars: 1, color: '#ef4444', pattern: GLASS_PATTERN_1, volume: 0.7, muted: true, instrument: 'synth' },
-  { name: '2 Bar', bars: 2, color: '#f97316', pattern: GLASS_PATTERN_2, volume: 0.7, muted: true, instrument: 'synth' },
-  { name: '3 Bar', bars: 3, color: '#eab308', pattern: GLASS_PATTERN_3, volume: 0.7, muted: true, instrument: 'synth' },
-  { name: '4 Bar', bars: 4, color: '#22c55e', pattern: GLASS_PATTERN_4, volume: 0.7, muted: true, instrument: 'synth' },
-  { name: '5 Bar', bars: 5, color: '#14b8a6', pattern: GLASS_PATTERN_5, volume: 0.7, muted: true, instrument: 'synth' },
-  { name: '6 Bar', bars: 6, color: '#3b82f6', pattern: GLASS_PATTERN_6, volume: 0.7, muted: true, instrument: 'synth' },
-  { name: '7 Bar', bars: 7, color: '#8b5cf6', pattern: GLASS_PATTERN_7, volume: 0.7, muted: true, instrument: 'synth' },
-  { name: '8 Bar', bars: 8, color: '#ec4899', pattern: GLASS_PATTERN_8, volume: 0.7, muted: true, instrument: 'synth' },
+  { name: 'Drums', bars: 1, color: '#ef4444', pattern: DRUM_PATTERN, volume: 0.8, muted: true, instrument: 'drums' },
+  { name: 'Bass', bars: 2, color: '#f97316', pattern: BASS_PATTERN, volume: 0.7, muted: true, instrument: 'bass' },
+  { name: 'Arp 1', bars: 3, color: '#eab308', pattern: ARPEGGIO_PATTERN, volume: 0.6, muted: true, instrument: 'arpeggio' },
+  { name: 'Chords', bars: 4, color: '#22c55e', pattern: CHORD_PATTERN, volume: 0.5, muted: true, instrument: 'chord' },
+  { name: 'Lead', bars: 5, color: '#3b82f6', pattern: LEAD_PATTERN, volume: 0.6, muted: true, instrument: 'lead' },
+  { name: 'Arp 2', bars: 6, color: '#14b8a6', pattern: ARPEGGIO_2_PATTERN, volume: 0.5, muted: true, instrument: 'arpeggio' },
+  { name: 'FX', bars: 7, color: '#8b5cf6', pattern: FX_PATTERN, volume: 0.4, muted: true, instrument: 'fx' },
+  { name: 'Vocal', bars: 8, color: '#ec4899', pattern: VOCAL_PATTERN, volume: 0.6, muted: true, instrument: 'vocal' },
 ];
 
 // Default sections

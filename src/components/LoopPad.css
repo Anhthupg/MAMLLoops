@@ -79,10 +79,22 @@
   box-shadow: 0 0 4px var(--loop-color);
 }
 
+.loop-pad-emoji {
+  font-size: 12px;
+  line-height: 1;
+  filter: grayscale(0.8);
+  opacity: 0.7;
+}
+
+.loop-pad.active .loop-pad-emoji {
+  filter: none;
+  opacity: 1;
+}
+
 .loop-pad-label {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
-  color: #888;
+  color: #666;
   font-family: monospace;
 }
 

@@ -1,19 +1,23 @@
 import * as Tone from 'tone';
-import type { Loop, TransportState, ClockSync, NoteEvent } from '../types';
+import type { Loop, TransportState, ClockSync, NoteEvent, InstrumentType } from '../types';
 
-// Glass-inspired arpeggio patterns
-const ARPEGGIO_PATTERNS = {
-  glass4: ['C4', 'E4', 'G4', 'B4', 'C5', 'B4', 'G4', 'E4'], // 4-bar feel
-  glass5: ['D4', 'F#4', 'A4', 'C5', 'E5', 'C5', 'A4', 'F#4', 'D4', 'A3'], // 5-bar feel
-  glass8: ['A3', 'E4', 'A4', 'C5', 'E5', 'A5', 'E5', 'C5', 'A4', 'E4', 'C4', 'E4', 'A4', 'C5', 'E5', 'A5'], // 8-bar feel
-  bass4: ['C2', 'C2', 'G2', 'G2', 'C2', 'C2', 'E2', 'G2'],
-  bass5: ['D2', 'D2', 'A2', 'D2', 'F#2', 'D2', 'A2', 'D2', 'D2', 'A1'],
+// Drum note mapping (using different notes for different drum sounds)
+// C1=Kick, D1=Snare, E1=HiHat Closed, F1=HiHat Open, G1=Clap, A1=Tom, B1=Rim
+const DRUM_NOTES = {
+  kick: 'C1',
+  snare: 'D1',
+  hihat: 'E1',
+  hihatOpen: 'F1',
+  clap: 'G1',
+  tom: 'A1',
+  rim: 'B1',
 };
 
 export class AudioEngine {
-  private synths: Map<string, Tone.PolySynth> = new Map();
+  private synths: Map<string, Tone.PolySynth | Tone.MembraneSynth | Tone.NoiseSynth | Tone.MetalSynth> = new Map();
   private sequences: Map<string, Tone.Sequence> = new Map();
   private loopBars: Map<string, number> = new Map(); // Store loop bar lengths
+  private loopInstruments: Map<string, InstrumentType> = new Map(); // Store loop instrument types
   private isStarted = false;
   private onBeatCallback?: (beat: number, bar: number) => void;
   private beatsPerBar = 4;
@@ -26,6 +30,13 @@ export class AudioEngine {
   private previewSynth: Tone.PolySynth | null = null;
   private previewPart: Tone.Part | null = null;
   private isPreviewPlaying = false;
+
+  // Drum kit synths (shared)
+  private drumKit: {
+    kick: Tone.MembraneSynth;
+    snare: Tone.NoiseSynth;
+    hihat: Tone.MetalSynth;
+  } | null = null;
 
   constructor() {
     // Set up transport
@@ -43,6 +54,189 @@ export class AudioEngine {
       },
     }).toDestination();
     this.previewSynth.volume.value = -6; // Slightly quieter than main
+
+    // Initialize shared drum kit
+    this.initDrumKit();
+  }
+
+  // Initialize shared drum kit synths
+  private initDrumKit(): void {
+    this.drumKit = {
+      // Kick drum - deep membrane
+      kick: new Tone.MembraneSynth({
+        pitchDecay: 0.05,
+        octaves: 6,
+        oscillator: { type: 'sine' },
+        envelope: {
+          attack: 0.001,
+          decay: 0.4,
+          sustain: 0.01,
+          release: 0.4,
+        },
+      }).toDestination(),
+
+      // Snare - noise burst
+      snare: new Tone.NoiseSynth({
+        noise: { type: 'white' },
+        envelope: {
+          attack: 0.001,
+          decay: 0.2,
+          sustain: 0,
+          release: 0.1,
+        },
+      }).toDestination(),
+
+      // Hi-hat - metallic
+      hihat: new Tone.MetalSynth({
+        envelope: {
+          attack: 0.001,
+          decay: 0.1,
+          release: 0.01,
+        },
+        harmonicity: 5.1,
+        modulationIndex: 32,
+        resonance: 4000,
+        octaves: 1.5,
+      }).toDestination(),
+    };
+
+    this.drumKit.kick.volume.value = -6;
+    this.drumKit.snare.volume.value = -10;
+    this.drumKit.hihat.volume.value = -12;
+  }
+
+  // Create synth based on instrument type
+  private createSynthForInstrument(instrument: InstrumentType, volume: number): Tone.PolySynth {
+    let synth: Tone.PolySynth;
+
+    switch (instrument) {
+      case 'drums':
+        // Drums use shared drum kit, but we still need a placeholder synth
+        // The actual drum sounds are handled in the sequence callback
+        synth = new Tone.PolySynth(Tone.Synth, {
+          oscillator: { type: 'sine' },
+          envelope: { attack: 0.001, decay: 0.1, sustain: 0, release: 0.1 },
+        }).toDestination();
+        synth.volume.value = -Infinity; // Mute - we use drum kit instead
+        break;
+
+      case 'bass':
+        // Deep, punchy bass
+        synth = new Tone.PolySynth(Tone.Synth, {
+          oscillator: { type: 'sawtooth' },
+          envelope: {
+            attack: 0.01,
+            decay: 0.3,
+            sustain: 0.4,
+            release: 0.3,
+          },
+        }).toDestination();
+        synth.volume.value = Tone.gainToDb(volume) - 3;
+        break;
+
+      case 'chord':
+        // Warm pad chords
+        synth = new Tone.PolySynth(Tone.Synth, {
+          oscillator: { type: 'sine' },
+          envelope: {
+            attack: 0.3,
+            decay: 0.5,
+            sustain: 0.7,
+            release: 1.0,
+          },
+        }).toDestination();
+        synth.volume.value = Tone.gainToDb(volume) - 6;
+        break;
+
+      case 'arpeggio':
+        // Classic Glass-style arpeggio (triangle for clarity)
+        synth = new Tone.PolySynth(Tone.Synth, {
+          oscillator: { type: 'triangle' },
+          envelope: {
+            attack: 0.02,
+            decay: 0.1,
+            sustain: 0.3,
+            release: 0.8,
+          },
+        }).toDestination();
+        synth.volume.value = Tone.gainToDb(volume);
+        break;
+
+      case 'lead':
+        // Bright, cutting lead
+        synth = new Tone.PolySynth(Tone.Synth, {
+          oscillator: { type: 'square' },
+          envelope: {
+            attack: 0.01,
+            decay: 0.2,
+            sustain: 0.5,
+            release: 0.4,
+          },
+        }).toDestination();
+        synth.volume.value = Tone.gainToDb(volume) - 3;
+        break;
+
+      case 'fx':
+        // Atmospheric/textural
+        synth = new Tone.PolySynth(Tone.Synth, {
+          oscillator: { type: 'sine' },
+          envelope: {
+            attack: 0.5,
+            decay: 1.0,
+            sustain: 0.3,
+            release: 2.0,
+          },
+        }).toDestination();
+        synth.volume.value = Tone.gainToDb(volume) - 9;
+        break;
+
+      case 'vocal':
+        // Vocal-like formant sound
+        synth = new Tone.PolySynth(Tone.Synth, {
+          oscillator: { type: 'sine' },
+          envelope: {
+            attack: 0.1,
+            decay: 0.3,
+            sustain: 0.6,
+            release: 0.5,
+          },
+        }).toDestination();
+        synth.volume.value = Tone.gainToDb(volume) - 3;
+        break;
+
+      default:
+        // Default synth
+        synth = new Tone.PolySynth(Tone.Synth, {
+          oscillator: { type: 'triangle' },
+          envelope: {
+            attack: 0.02,
+            decay: 0.1,
+            sustain: 0.3,
+            release: 0.8,
+          },
+        }).toDestination();
+        synth.volume.value = Tone.gainToDb(volume);
+    }
+
+    return synth;
+  }
+
+  // Play drum sound based on note
+  private playDrumNote(note: string, time: Tone.Unit.Time): void {
+    if (!this.drumKit) return;
+
+    if (note === DRUM_NOTES.kick || note.includes('C1') || note.includes('C2')) {
+      this.drumKit.kick.triggerAttackRelease('C1', '8n', time);
+    } else if (note === DRUM_NOTES.snare || note.includes('D1') || note.includes('D2')) {
+      this.drumKit.snare.triggerAttackRelease('8n', time);
+    } else if (note === DRUM_NOTES.hihat || note.includes('E1') || note.includes('F1') || note.includes('E2')) {
+      this.drumKit.hihat.triggerAttackRelease('32n', time);
+    } else if (note === DRUM_NOTES.clap || note.includes('G1')) {
+      this.drumKit.snare.triggerAttackRelease('16n', time);
+    } else {
+      // Default to hi-hat for other notes
+      this.drumKit.hihat.triggerAttackRelease('32n', time);
+    }
   }
 
   async start(): Promise<void> {
@@ -129,66 +323,47 @@ export class AudioEngine {
     // Clean up existing
     this.removeLoop(loop.id);
 
-    // Create synth based on loop characteristics
-    const synth = new Tone.PolySynth(Tone.Synth, {
-      oscillator: { type: loop.bars <= 4 ? 'triangle' : 'sine' },
-      envelope: {
-        attack: 0.02,
-        decay: 0.1,
-        sustain: 0.3,
-        release: 0.8,
-      },
-    }).toDestination();
+    // Get instrument type (default to arpeggio for backwards compatibility)
+    const instrument = loop.instrument || 'arpeggio';
 
-    synth.volume.value = Tone.gainToDb(loop.volume);
+    // Create synth based on instrument type
+    const synth = this.createSynthForInstrument(instrument, loop.volume);
     this.synths.set(loop.id, synth);
-    this.loopBars.set(loop.id, loop.bars); // Store loop bar length
+    this.loopBars.set(loop.id, loop.bars);
+    this.loopInstruments.set(loop.id, instrument);
 
-    // Calculate the loop duration in bars (use "Xm" notation for Tone.js)
+    // Calculate the loop duration in bars
     const loopDuration = `${loop.bars}m`;
 
-    // Use the loop's actual pattern if it has one, otherwise fall back to arpeggio
+    // Use the loop's actual pattern if it has one
     if (loop.pattern && loop.pattern.length > 0) {
-      // Create Part for precise timing with custom pattern
-      // Convert beat times to Tone.js time notation (numbers are interpreted as seconds!)
       type PartEvent = { time: string; note: NoteEvent };
       const partEvents: PartEvent[] = loop.pattern.map(n => ({
         time: this.beatsToToneTime(n.time),
         note: n
       }));
+
+      // For drums, use drum kit; for others, use the synth
+      const isDrums = instrument === 'drums';
+
       const part = new Tone.Part<PartEvent>((time, event) => {
         if (!loop.muted) {
-          synth.triggerAttackRelease(
-            event.note.note,
-            event.note.duration,
-            time,
-            event.note.velocity || 0.8
-          );
+          if (isDrums) {
+            this.playDrumNote(event.note.note, time);
+          } else {
+            synth.triggerAttackRelease(
+              event.note.note,
+              event.note.duration,
+              time,
+              event.note.velocity || 0.8
+            );
+          }
         }
       }, partEvents);
 
       part.loop = true;
-      part.loopEnd = loopDuration; // Use "Xm" notation (bars) for Tone.js
+      part.loopEnd = loopDuration;
       this.sequences.set(loop.id, part as unknown as Tone.Sequence);
-    } else {
-      // Fall back to default arpeggio pattern
-      const patternKey = `glass${loop.bars}` as keyof typeof ARPEGGIO_PATTERNS;
-      const notes = ARPEGGIO_PATTERNS[patternKey] || ARPEGGIO_PATTERNS.glass4;
-
-      const sequence = new Tone.Sequence(
-        (time, note) => {
-          if (!loop.muted) {
-            synth.triggerAttackRelease(note, '8n', time);
-          }
-        },
-        notes,
-        '8n'
-      );
-
-      sequence.loop = true;
-      // Use bar notation - Tone.js accepts string but TypeScript types are incomplete
-      (sequence as any).loopEnd = loopDuration;
-      this.sequences.set(loop.id, sequence);
     }
   }
 
@@ -235,12 +410,15 @@ export class AudioEngine {
     }
 
     this.loopBars.delete(loopId);
+    this.loopInstruments.delete(loopId);
   }
 
   // Update a loop's pattern with new notes
   updateLoopPattern(loopId: string, pattern: NoteEvent[]): void {
     const synth = this.synths.get(loopId);
     const oldSequence = this.sequences.get(loopId);
+    const instrument = this.loopInstruments.get(loopId) || 'arpeggio';
+    const isDrums = instrument === 'drums';
 
     if (!synth) return;
 
@@ -251,7 +429,6 @@ export class AudioEngine {
       oldSequence.dispose();
 
       // Create new sequence with the pattern
-      // Convert beat times to Tone.js time notation (numbers are interpreted as seconds!)
       type PartEvent = { time: string; note: NoteEvent };
       const partEvents: PartEvent[] = pattern.map(n => ({
         time: this.beatsToToneTime(n.time),
@@ -262,8 +439,13 @@ export class AudioEngine {
         note: e.note.note,
         duration: e.note.duration
       })));
+
       const part = new Tone.Part<PartEvent>((time, event) => {
-        synth.triggerAttackRelease(event.note.note, event.note.duration, time, event.note.velocity || 0.8);
+        if (isDrums) {
+          this.playDrumNote(event.note.note, time);
+        } else {
+          synth.triggerAttackRelease(event.note.note, event.note.duration, time, event.note.velocity || 0.8);
+        }
       }, partEvents);
 
       // Configure looping - use stored loop bars, NOT estimated from pattern
@@ -387,10 +569,17 @@ export class AudioEngine {
       this.previewSynth.dispose();
       this.previewSynth = null;
     }
+    if (this.drumKit) {
+      this.drumKit.kick.dispose();
+      this.drumKit.snare.dispose();
+      this.drumKit.hihat.dispose();
+      this.drumKit = null;
+    }
     this.sequences.forEach((seq) => seq.dispose());
     this.synths.forEach((synth) => synth.dispose());
     this.sequences.clear();
     this.synths.clear();
+    this.loopInstruments.clear();
     Tone.getTransport().stop();
     Tone.getTransport().cancel();
   }
