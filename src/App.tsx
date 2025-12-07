@@ -297,6 +297,7 @@ function App() {
         <p>
           Inspired by Philip Glass • Polymetric patterns meet collaborative music-making
         </p>
+        <p className="copyright">© Phan Gia Anh Thư</p>
       </footer>
     </div>
   );
