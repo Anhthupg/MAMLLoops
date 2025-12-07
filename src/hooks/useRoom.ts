@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { SyncManager } from '../sync/SyncManager';
-import type { Player, RoomState } from '../types';
+import type { RoomState } from '../types';
 
 export function useRoom() {
   const [roomState, setRoomState] = useState<RoomState | null>(null);
-  const [currentPlayer, setCurrentPlayer] = useState<Player | null>(null);
+  const [playerId, setPlayerId] = useState<string | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<{
     connected: boolean;
     peerCount: number;
@@ -12,12 +12,15 @@ export function useRoom() {
   }>({ connected: false, peerCount: 0, isHost: false });
   const syncRef = useRef<SyncManager | null>(null);
 
+  // Derive currentPlayer from roomState to keep it in sync
+  const currentPlayer = roomState?.players.find(p => p.id === playerId) || null;
+
   const createRoom = useCallback((playerName: string, playerColor: string) => {
     const sync = new SyncManager();
     syncRef.current = sync;
 
     const player = sync.join(playerName, playerColor);
-    setCurrentPlayer(player);
+    setPlayerId(player.id);
 
     sync.onStateChange((state) => {
       setRoomState(state);
@@ -38,7 +41,7 @@ export function useRoom() {
     syncRef.current = sync;
 
     const player = sync.join(playerName, playerColor);
-    setCurrentPlayer(player);
+    setPlayerId(player.id);
 
     sync.onStateChange((state) => {
       setRoomState(state);
@@ -62,7 +65,7 @@ export function useRoom() {
       syncRef.current = null;
     }
     setRoomState(null);
-    setCurrentPlayer(null);
+    setPlayerId(null);
   }, []);
 
   const triggerLoop = useCallback((loopId: string, active: boolean) => {
