@@ -5,6 +5,11 @@ import type { Player, RoomState } from '../types';
 export function useRoom() {
   const [roomState, setRoomState] = useState<RoomState | null>(null);
   const [currentPlayer, setCurrentPlayer] = useState<Player | null>(null);
+  const [connectionStatus, setConnectionStatus] = useState<{
+    connected: boolean;
+    peerCount: number;
+    isHost: boolean;
+  }>({ connected: false, peerCount: 0, isHost: false });
   const syncRef = useRef<SyncManager | null>(null);
 
   const createRoom = useCallback((playerName: string, playerColor: string) => {
@@ -16,6 +21,10 @@ export function useRoom() {
 
     sync.onStateChange((state) => {
       setRoomState(state);
+    });
+
+    sync.onConnectionStatusChange((connected, peerCount) => {
+      setConnectionStatus({ connected, peerCount, isHost: true });
     });
 
     // Initialize state
@@ -33,6 +42,10 @@ export function useRoom() {
 
     sync.onStateChange((state) => {
       setRoomState(state);
+    });
+
+    sync.onConnectionStatusChange((connected, peerCount) => {
+      setConnectionStatus({ connected, peerCount, isHost: false });
     });
 
     // Request sync from existing members
@@ -98,6 +111,7 @@ export function useRoom() {
   return {
     roomState,
     currentPlayer,
+    connectionStatus,
     createRoom,
     joinRoom,
     leaveRoom,

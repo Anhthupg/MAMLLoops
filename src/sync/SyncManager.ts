@@ -1,66 +1,122 @@
 import { v4 as uuidv4 } from 'uuid';
-import Peer, { DataConnection } from 'peerjs';
+import Peer from 'peerjs';
 import type { RoomState, Player, SyncMessage, Loop, Section } from '../types';
 
 type MessageHandler = (message: SyncMessage) => void;
+type ConnectionStatusHandler = (connected: boolean, peerCount: number) => void;
 
 // Cross-device sync using PeerJS (WebRTC)
 class PeerSync {
-  private peer: Peer;
-  private connections: Map<string, DataConnection> = new Map();
+  private peer: Peer | null = null;
+  private connections: Map<string, any> = new Map();
   private handlers: Set<MessageHandler> = new Set();
+  private statusHandlers: Set<ConnectionStatusHandler> = new Set();
   private roomId: string;
   private isHost: boolean;
-  private hostConnection: DataConnection | null = null;
+  private hostConnection: any = null;
+  private reconnectAttempts = 0;
+  private maxReconnectAttempts = 3;
 
   constructor(roomId: string, isHost: boolean) {
-    this.roomId = roomId;
+    this.roomId = roomId.toUpperCase(); // Normalize room ID
     this.isHost = isHost;
+    this.initPeer();
+  }
 
+  private initPeer(): void {
     // Create peer with room-based ID for host, random for others
-    const peerId = isHost ? `maml-${roomId}` : `maml-${roomId}-${uuidv4().slice(0, 6)}`;
+    const peerId = this.isHost
+      ? `maml-${this.roomId}`
+      : `maml-${this.roomId}-${Date.now().toString(36)}`;
+
+    console.log('Creating peer with ID:', peerId);
 
     this.peer = new Peer(peerId, {
-      debug: 0, // Set to 2 for debugging
-    });
-
-    this.peer.on('open', () => {
-      console.log('Peer connected:', this.peer.id);
-      if (!isHost) {
-        // Connect to host
-        this.connectToHost();
+      debug: 2, // Enable debugging
+      config: {
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:global.stun.twilio.com:3478' }
+        ]
       }
     });
 
+    this.peer.on('open', (id) => {
+      console.log('✅ Peer connected with ID:', id);
+      this.reconnectAttempts = 0;
+
+      if (!this.isHost) {
+        // Wait a moment then connect to host
+        setTimeout(() => this.connectToHost(), 500);
+      }
+
+      this.notifyStatus();
+    });
+
     this.peer.on('connection', (conn) => {
+      console.log('📥 Incoming connection from:', conn.peer);
       this.setupConnection(conn);
     });
 
-    this.peer.on('error', (err) => {
-      console.error('Peer error:', err);
-      // If host doesn't exist, we might be the first one
+    this.peer.on('error', (err: any) => {
+      console.error('❌ Peer error:', err.type, err.message);
+
       if (err.type === 'peer-unavailable') {
-        console.log('Host not available yet');
+        console.log('Host not found. Make sure the room code is correct.');
+      } else if (err.type === 'unavailable-id') {
+        console.log('Room already exists or ID conflict');
+      }
+
+      this.notifyStatus();
+    });
+
+    this.peer.on('disconnected', () => {
+      console.log('⚠️ Peer disconnected from server');
+      if (this.reconnectAttempts < this.maxReconnectAttempts) {
+        this.reconnectAttempts++;
+        console.log(`Attempting reconnect ${this.reconnectAttempts}/${this.maxReconnectAttempts}`);
+        setTimeout(() => this.peer?.reconnect(), 1000);
       }
     });
   }
 
   private connectToHost(): void {
+    if (!this.peer) return;
+
     const hostId = `maml-${this.roomId}`;
-    console.log('Connecting to host:', hostId);
-    const conn = this.peer.connect(hostId, { reliable: true });
-    this.hostConnection = conn;
-    this.setupConnection(conn);
+    console.log('🔗 Connecting to host:', hostId);
+
+    try {
+      const conn = this.peer.connect(hostId, {
+        reliable: true,
+        serialization: 'json'
+      });
+
+      if (conn) {
+        this.hostConnection = conn;
+        this.setupConnection(conn);
+      }
+    } catch (err) {
+      console.error('Failed to connect to host:', err);
+    }
   }
 
-  private setupConnection(conn: DataConnection): void {
+  private setupConnection(conn: any): void {
     conn.on('open', () => {
-      console.log('Connection opened:', conn.peer);
+      console.log('✅ Connection opened with:', conn.peer);
       this.connections.set(conn.peer, conn);
+      this.notifyStatus();
+
+      // If we're joining, request state sync
+      if (!this.isHost && conn === this.hostConnection) {
+        console.log('Requesting state sync from host...');
+      }
     });
 
-    conn.on('data', (data) => {
+    conn.on('data', (data: any) => {
+      console.log('📨 Received data:', data.type);
       const message = data as SyncMessage;
+
       // Handle received message
       this.handlers.forEach((handler) => handler(message));
 
@@ -73,9 +129,10 @@ class PeerSync {
     conn.on('close', () => {
       console.log('Connection closed:', conn.peer);
       this.connections.delete(conn.peer);
+      this.notifyStatus();
     });
 
-    conn.on('error', (err) => {
+    conn.on('error', (err: any) => {
       console.error('Connection error:', err);
     });
   }
@@ -83,12 +140,27 @@ class PeerSync {
   private broadcast(message: SyncMessage, excludePeer?: string): void {
     this.connections.forEach((conn, peerId) => {
       if (peerId !== excludePeer && conn.open) {
-        conn.send(message);
+        try {
+          conn.send(message);
+        } catch (err) {
+          console.error('Failed to send to peer:', peerId, err);
+        }
       }
     });
   }
 
+  private notifyStatus(): void {
+    const connected = this.isHost
+      ? (this.peer?.open ?? false)
+      : (this.hostConnection?.open ?? false);
+    const peerCount = this.connections.size;
+
+    this.statusHandlers.forEach(handler => handler(connected, peerCount));
+  }
+
   send(message: SyncMessage): void {
+    console.log('📤 Sending:', message.type);
+
     // Always handle locally first
     this.handlers.forEach((handler) => handler(message));
 
@@ -97,7 +169,13 @@ class PeerSync {
       this.broadcast(message);
     } else if (this.hostConnection?.open) {
       // Send to host
-      this.hostConnection.send(message);
+      try {
+        this.hostConnection.send(message);
+      } catch (err) {
+        console.error('Failed to send to host:', err);
+      }
+    } else {
+      console.warn('⚠️ Not connected to host yet');
     }
   }
 
@@ -106,13 +184,27 @@ class PeerSync {
     return () => this.handlers.delete(handler);
   }
 
+  onStatusChange(handler: ConnectionStatusHandler): () => void {
+    this.statusHandlers.add(handler);
+    return () => this.statusHandlers.delete(handler);
+  }
+
   close(): void {
-    this.connections.forEach((conn) => conn.close());
-    this.peer.destroy();
+    this.connections.forEach((conn) => {
+      try { conn.close(); } catch (e) { /* ignore */ }
+    });
+    this.peer?.destroy();
   }
 
   getConnectionCount(): number {
     return this.connections.size;
+  }
+
+  isConnected(): boolean {
+    if (this.isHost) {
+      return this.peer?.open ?? false;
+    }
+    return this.hostConnection?.open ?? false;
   }
 }
 
@@ -136,14 +228,16 @@ export class SyncManager {
   private sync: PeerSync;
   private state: RoomState;
   private stateListeners: Set<(state: RoomState) => void> = new Set();
-  private isHost: boolean;
+  private connectionStatusListeners: Set<(connected: boolean, peerCount: number) => void> = new Set();
+  private isHostFlag: boolean;
 
   constructor(roomId?: string) {
     // If no roomId provided, we're creating a new room (host)
-    this.isHost = !roomId;
-    this.roomId = roomId || uuidv4().slice(0, 6).toUpperCase();
+    this.isHostFlag = !roomId;
+    // Normalize room ID to uppercase
+    this.roomId = (roomId || this.generateRoomCode()).toUpperCase();
     this.playerId = uuidv4();
-    this.sync = new PeerSync(this.roomId, this.isHost);
+    this.sync = new PeerSync(this.roomId, this.isHostFlag);
 
     // Initialize state
     this.state = {
@@ -156,11 +250,27 @@ export class SyncManager {
       currentBeat: 0,
       currentBar: 0,
       isPlaying: false,
-      leaderId: this.playerId, // First to join is leader
+      leaderId: this.playerId,
     };
 
     // Listen for sync messages
     this.sync.onMessage(this.handleMessage.bind(this));
+
+    // Forward connection status
+    this.sync.onStatusChange((connected, peerCount) => {
+      console.log(`Connection status: ${connected ? 'connected' : 'disconnected'}, peers: ${peerCount}`);
+      this.connectionStatusListeners.forEach(listener => listener(connected, peerCount));
+    });
+  }
+
+  private generateRoomCode(): string {
+    // Generate a 4-character alphanumeric code (easier to type)
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Exclude confusing chars
+    let code = '';
+    for (let i = 0; i < 4; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return code;
   }
 
   getRoomId(): string {
@@ -189,10 +299,13 @@ export class SyncManager {
       isReady: false,
     };
 
-    // Small delay to ensure connection is established
+    // Delay for non-host to ensure connection is established
+    const delay = this.isHostFlag ? 100 : 2000;
+
     setTimeout(() => {
+      console.log('Sending join message for player:', player.name);
       this.sync.send({ type: 'join', player });
-    }, this.isHost ? 0 : 1000);
+    }, delay);
 
     return player;
   }
@@ -250,7 +363,6 @@ export class SyncManager {
 
   // Request full state sync (for late joiners)
   requestSync(): void {
-    // Leader will respond with full state
     if (this.isLeader()) {
       this.sync.send({ type: 'state_sync', state: this.state });
     }
@@ -262,7 +374,15 @@ export class SyncManager {
     return () => this.stateListeners.delete(listener);
   }
 
+  // Subscribe to connection status changes
+  onConnectionStatusChange(listener: (connected: boolean, peerCount: number) => void): () => void {
+    this.connectionStatusListeners.add(listener);
+    return () => this.connectionStatusListeners.delete(listener);
+  }
+
   private handleMessage(message: SyncMessage): void {
+    console.log('Handling message:', message.type);
+
     switch (message.type) {
       case 'join':
         this.handleJoin(message.player);
@@ -293,9 +413,10 @@ export class SyncManager {
         };
         break;
       case 'state_sync':
-        // Only accept if we're not the leader
-        if (!this.isLeader()) {
-          this.state = message.state;
+        // Accept state sync if we're not the original leader
+        if (!this.isHostFlag) {
+          this.state = { ...message.state };
+          // Keep our player ID as not the leader
         }
         break;
       case 'ready':
@@ -309,16 +430,18 @@ export class SyncManager {
   private handleJoin(player: Player): void {
     const exists = this.state.players.find((p) => p.id === player.id);
     if (!exists) {
+      console.log('Player joined:', player.name);
       this.state = {
         ...this.state,
         players: [...this.state.players, player],
       };
 
-      // If this is a late joiner and we're leader, send them state
-      if (this.isLeader() && player.id !== this.playerId) {
+      // If this is a late joiner and we're the host, send them state
+      if (this.isHostFlag && player.id !== this.playerId) {
         setTimeout(() => {
+          console.log('Sending state sync to new player');
           this.sync.send({ type: 'state_sync', state: this.state });
-        }, 100);
+        }, 500);
       }
     }
   }

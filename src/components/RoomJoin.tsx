@@ -84,7 +84,7 @@ export function RoomJoin({ onJoin }: RoomJoinProps) {
             <input
               type="text"
               value={roomId}
-              onChange={(e) => setRoomId(e.target.value.toLowerCase())}
+              onChange={(e) => setRoomId(e.target.value.toUpperCase())}
               placeholder="Enter room code"
               maxLength={8}
               required
@@ -108,10 +108,15 @@ export function RoomJoin({ onJoin }: RoomJoinProps) {
 interface RoomShareProps {
   roomId: string;
   playerCount: number;
+  connectionStatus?: {
+    connected: boolean;
+    peerCount: number;
+    isHost: boolean;
+  };
 }
 
-export function RoomShare({ roomId, playerCount }: RoomShareProps) {
-  const shareUrl = `${window.location.origin}?room=${roomId}`;
+export function RoomShare({ roomId, playerCount, connectionStatus }: RoomShareProps) {
+  const shareUrl = `${window.location.origin}${window.location.pathname}?room=${roomId}`;
   const [copied, setCopied] = useState(false);
 
   const copyLink = async () => {
@@ -125,6 +130,15 @@ export function RoomShare({ roomId, playerCount }: RoomShareProps) {
       <div className="share-info">
         <span className="room-code">{roomId}</span>
         <span className="player-count">{playerCount} player{playerCount !== 1 ? 's' : ''}</span>
+        {connectionStatus && (
+          <span
+            className={`connection-status ${connectionStatus.connected ? 'connected' : 'disconnected'}`}
+            title={`${connectionStatus.isHost ? 'Host' : 'Client'} - ${connectionStatus.peerCount} peers`}
+          >
+            {connectionStatus.connected ? '●' : '○'} {connectionStatus.isHost ? 'Host' : 'Client'}
+            {connectionStatus.peerCount > 0 && ` (${connectionStatus.peerCount})`}
+          </span>
+        )}
       </div>
 
       <div className="share-actions">

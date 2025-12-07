@@ -98,6 +98,7 @@ function App() {
         <RoomShare
           roomId={roomState.id}
           playerCount={roomState.players.length}
+          connectionStatus={room.connectionStatus}
         />
       </header>
 
