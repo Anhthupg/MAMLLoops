@@ -1,0 +1,150 @@
+.transport-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: #1a1a2e;
+  border-radius: 12px;
+}
+
+.transport-button {
+  width: 48px;
+  height: 48px;
+  border: none;
+  border-radius: 50%;
+  background: #252542;
+  color: #888;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.transport-button svg {
+  width: 20px;
+  height: 20px;
+}
+
+.transport-button:not(:disabled):hover {
+  background: #333;
+  color: #fff;
+}
+
+.transport-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.transport-button.play {
+  width: 56px;
+  height: 56px;
+  background: #4ade80;
+  color: #000;
+}
+
+.transport-button.play:not(:disabled):hover {
+  background: #22c55e;
+  color: #000;
+}
+
+.transport-button.play.active {
+  background: #fbbf24;
+}
+
+.transport-button.stop {
+  background: #ef4444;
+  color: #fff;
+}
+
+.transport-button.stop:not(:disabled):hover {
+  background: #dc2626;
+}
+
+.tempo-control {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: 16px;
+  padding-left: 16px;
+  border-left: 1px solid #333;
+}
+
+.tempo-control label {
+  font-size: 11px;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.tempo-control input[type="range"] {
+  width: 120px;
+  height: 4px;
+  appearance: none;
+  background: #333;
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.tempo-control input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #60a5fa;
+  cursor: pointer;
+}
+
+.tempo-control input[type="range"]:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.tempo-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
+  font-family: monospace;
+  min-width: 40px;
+}
+
+.sync-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  font-size: 12px;
+  color: #4ade80;
+}
+
+.sync-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #4ade80;
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+  .transport-controls {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .tempo-control {
+    margin-left: 0;
+    padding-left: 0;
+    border-left: none;
+    width: 100%;
+    justify-content: center;
+    margin-top: 8px;
+    padding-top: 12px;
+    border-top: 1px solid #333;
+  }
+}

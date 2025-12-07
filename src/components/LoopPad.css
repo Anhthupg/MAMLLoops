@@ -1,0 +1,153 @@
+.loop-pad-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  background: #1a1a2e;
+  border-radius: 12px;
+}
+
+.player-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-left: 3px solid;
+  color: #fff;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.player-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.pads-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: 12px;
+}
+
+.loop-pad {
+  position: relative;
+  aspect-ratio: 1;
+  min-width: 100px;
+  border: none;
+  border-radius: 12px;
+  background: #252542;
+  cursor: pointer;
+  overflow: hidden;
+  transition: transform 0.1s, box-shadow 0.2s;
+}
+
+.loop-pad:hover {
+  transform: scale(1.02);
+}
+
+.loop-pad:active {
+  transform: scale(0.98);
+}
+
+.loop-pad.active {
+  box-shadow: 0 0 20px var(--loop-color), inset 0 0 20px rgba(255, 255, 255, 0.1);
+}
+
+.loop-pad-progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 4px;
+  width: calc(var(--phase) * 100%);
+  background: var(--loop-color);
+  transition: width 0.1s linear;
+}
+
+.loop-pad.active .loop-pad-progress {
+  background: var(--loop-color);
+  box-shadow: 0 0 10px var(--loop-color);
+}
+
+.loop-pad-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 12px;
+  color: #888;
+}
+
+.loop-pad.active .loop-pad-content {
+  color: #fff;
+}
+
+.loop-pad-name {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.loop-pad-bars {
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+.loop-pad-position {
+  font-size: 18px;
+  font-weight: 700;
+  margin-top: 8px;
+  font-family: monospace;
+}
+
+.loop-pad.active .loop-pad-position {
+  color: var(--loop-color);
+}
+
+/* Ring visualization */
+.loop-pad-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 80%;
+  height: 80%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  opacity: 0.3;
+}
+
+.loop-pad.active .loop-pad-ring {
+  opacity: 0.6;
+}
+
+.ring-segment {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 2px;
+  height: 50%;
+  transform-origin: bottom center;
+  background: #444;
+}
+
+.ring-segment.filled {
+  background: var(--loop-color);
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+  .loop-pad {
+    min-width: 80px;
+  }
+
+  .loop-pad-name {
+    font-size: 12px;
+  }
+
+  .loop-pad-position {
+    font-size: 16px;
+  }
+}
