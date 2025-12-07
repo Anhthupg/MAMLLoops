@@ -125,27 +125,48 @@ export class AudioEngine {
     synth.volume.value = Tone.gainToDb(loop.volume);
     this.synths.set(loop.id, synth);
 
-    // Get pattern based on loop length
-    const patternKey = `glass${loop.bars}` as keyof typeof ARPEGGIO_PATTERNS;
-    const notes = ARPEGGIO_PATTERNS[patternKey] || ARPEGGIO_PATTERNS.glass4;
-
     // Calculate the loop duration in bars
     const loopDuration = `${loop.bars}m`;
+    const loopDurationBeats = loop.bars * this.beatsPerBar;
 
-    // Create sequence that loops
-    const sequence = new Tone.Sequence(
-      (time, note) => {
+    // Use the loop's actual pattern if it has one, otherwise fall back to arpeggio
+    if (loop.pattern && loop.pattern.length > 0) {
+      // Create Part for precise timing with custom pattern
+      type PartEvent = { time: number; note: NoteEvent };
+      const partEvents: PartEvent[] = loop.pattern.map(n => ({ time: n.time, note: n }));
+      const part = new Tone.Part<PartEvent>((time, event) => {
         if (!loop.muted) {
-          synth.triggerAttackRelease(note, '8n', time);
+          synth.triggerAttackRelease(
+            event.note.note,
+            event.note.duration,
+            time,
+            event.note.velocity || 0.8
+          );
         }
-      },
-      notes,
-      '8n'
-    );
+      }, partEvents);
 
-    sequence.loop = true;
-    sequence.loopEnd = Tone.Time(loopDuration).toSeconds();
-    this.sequences.set(loop.id, sequence);
+      part.loop = true;
+      part.loopEnd = loopDurationBeats; // in beats
+      this.sequences.set(loop.id, part as unknown as Tone.Sequence);
+    } else {
+      // Fall back to default arpeggio pattern
+      const patternKey = `glass${loop.bars}` as keyof typeof ARPEGGIO_PATTERNS;
+      const notes = ARPEGGIO_PATTERNS[patternKey] || ARPEGGIO_PATTERNS.glass4;
+
+      const sequence = new Tone.Sequence(
+        (time, note) => {
+          if (!loop.muted) {
+            synth.triggerAttackRelease(note, '8n', time);
+          }
+        },
+        notes,
+        '8n'
+      );
+
+      sequence.loop = true;
+      sequence.loopEnd = Tone.Time(loopDuration).toSeconds();
+      this.sequences.set(loop.id, sequence);
+    }
   }
 
   startLoop(loopId: string): void {
