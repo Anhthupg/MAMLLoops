@@ -273,6 +273,8 @@ export class SyncManager {
   private state: RoomState;
   private stateListeners: Set<(state: RoomState) => void> = new Set();
   private connectionStatusListeners: Set<(connected: boolean, peerCount: number) => void> = new Set();
+  private clockSyncListeners: Set<(clock: { leaderTime: number; transportPosition: number; tempo: number }) => void> = new Set();
+  private latencyListeners: Set<(latency: number) => void> = new Set();
   private isHostFlag: boolean;
 
   constructor(roomId?: string) {
@@ -457,6 +459,18 @@ export class SyncManager {
     return () => this.connectionStatusListeners.delete(listener);
   }
 
+  // Subscribe to clock sync messages (for audio engine)
+  onClockSync(listener: (clock: { leaderTime: number; transportPosition: number; tempo: number }) => void): () => void {
+    this.clockSyncListeners.add(listener);
+    return () => this.clockSyncListeners.delete(listener);
+  }
+
+  // Subscribe to latency updates
+  onLatencyUpdate(listener: (latency: number) => void): () => void {
+    this.latencyListeners.add(listener);
+    return () => this.latencyListeners.delete(listener);
+  }
+
   private handleMessage(message: SyncMessage): void {
     console.log('Handling message:', message.type);
 
@@ -530,7 +544,8 @@ export class SyncManager {
     const localTime = performance.now();
     const clockOffset = localTime - clock.leaderTime;
     console.log(`Clock sync: offset=${clockOffset.toFixed(2)}ms`);
-    // Audio engine can use this to adjust timing
+    // Notify audio engine via listeners
+    this.clockSyncListeners.forEach(listener => listener(clock));
   }
 
   private handlePong(sendTime: number, _receiveTime: number): void {
@@ -538,6 +553,8 @@ export class SyncManager {
     const roundTrip = now - sendTime;
     const latency = roundTrip / 2;
     console.log(`Latency: ${latency.toFixed(2)}ms (RTT: ${roundTrip.toFixed(2)}ms)`);
+    // Notify listeners about latency
+    this.latencyListeners.forEach(listener => listener(latency));
   }
 
   private handleLoopUpdate(playerId: string, loopId: string, pattern: NoteEvent[]): void {

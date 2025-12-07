@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { SyncManager } from '../sync/SyncManager';
-import type { RoomState } from '../types';
+import { audioEngine } from '../audio/AudioEngine';
+import type { RoomState, ClockSync } from '../types';
 
 export function useRoom() {
   const [roomState, setRoomState] = useState<RoomState | null>(null);
@@ -30,6 +31,15 @@ export function useRoom() {
       setConnectionStatus({ connected, peerCount, isHost: true });
     });
 
+    // Wire up clock sync for audio engine (host doesn't need this, but for completeness)
+    sync.onClockSync((clock) => {
+      audioEngine.handleClockSync(clock);
+    });
+
+    sync.onLatencyUpdate((latency) => {
+      audioEngine.setLatency(latency);
+    });
+
     // Initialize state
     setRoomState(sync.getState());
 
@@ -49,6 +59,15 @@ export function useRoom() {
 
     sync.onConnectionStatusChange((connected, peerCount) => {
       setConnectionStatus({ connected, peerCount, isHost: false });
+    });
+
+    // Wire up clock sync for audio engine - critical for non-host devices
+    sync.onClockSync((clock) => {
+      audioEngine.handleClockSync(clock);
+    });
+
+    sync.onLatencyUpdate((latency) => {
+      audioEngine.setLatency(latency);
     });
 
     // Request sync from existing members
@@ -102,6 +121,39 @@ export function useRoom() {
     return false;
   }, [currentPlayer]);
 
+  // Send clock sync (leader only) - call this periodically during playback
+  const sendClockSync = useCallback(() => {
+    if (syncRef.current && syncRef.current.isLeader()) {
+      const position = audioEngine.getCurrentPositionInBars();
+      syncRef.current.sendClockSync(position);
+    }
+  }, []);
+
+  // Ping peers to measure latency
+  const pingPeers = useCallback(() => {
+    if (syncRef.current) {
+      syncRef.current.pingPeers();
+    }
+  }, []);
+
+  // Handle incoming clock sync (called by SyncManager)
+  const handleClockSync = useCallback((clock: ClockSync) => {
+    audioEngine.handleClockSync(clock);
+  }, []);
+
+  // Start playback with synchronized timing
+  const startSyncedPlayback = useCallback((startTime: number) => {
+    audioEngine.playSynced(startTime);
+  }, []);
+
+  // Get sync stats for debugging
+  const getSyncStats = useCallback(() => {
+    return {
+      latency: audioEngine.getLatency(),
+      clockOffset: audioEngine.getClockOffset(),
+    };
+  }, []);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -123,5 +175,10 @@ export function useRoom() {
     changeSection,
     updateTransport,
     isLeader,
+    sendClockSync,
+    pingPeers,
+    handleClockSync,
+    startSyncedPlayback,
+    getSyncStats,
   };
 }
