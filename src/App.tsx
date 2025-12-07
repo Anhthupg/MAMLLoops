@@ -63,6 +63,35 @@ function App() {
     );
   }, [room.roomState]);
 
+  // Track previous patterns to detect changes from other users
+  const prevPatternsRef = useRef<Map<string, string>>(new Map());
+
+  // Sync pattern changes from other users to local audio engine
+  useEffect(() => {
+    if (!room.roomState) return;
+
+    // Get all loops from all players (not just current player)
+    const allPlayerLoops = room.roomState.players.flatMap(p => p.loops);
+
+    allPlayerLoops.forEach(loop => {
+      // Create a hash of the pattern for comparison
+      const patternHash = JSON.stringify(loop.pattern);
+      const prevHash = prevPatternsRef.current.get(loop.id);
+
+      // If pattern changed and it's not our own loop (we already update our own)
+      if (prevHash !== undefined && prevHash !== patternHash) {
+        const isOwnLoop = room.currentPlayer?.loops.some(l => l.id === loop.id);
+        if (!isOwnLoop) {
+          // Update audio engine with the new pattern from other user
+          audio.updateLoopPattern(loop.id, loop.pattern);
+        }
+      }
+
+      // Update the ref
+      prevPatternsRef.current.set(loop.id, patternHash);
+    });
+  }, [room.roomState, room.currentPlayer, audio]);
+
   // Apply queued pattern changes when loop cycles
   useEffect(() => {
     if (queuedChanges.length === 0) return;
@@ -79,7 +108,10 @@ function App() {
 
     if (changesToApply.length > 0) {
       changesToApply.forEach(change => {
+        // Update local audio engine
         audio.updateLoopPattern(change.loopId, change.pattern);
+        // Sync pattern to other users
+        room.updateLoopPattern(change.loopId, change.pattern);
       });
 
       // Remove applied changes
@@ -87,7 +119,7 @@ function App() {
         prev.filter(c => !changesToApply.some(a => a.loopId === c.loopId))
       );
     }
-  }, [audio.currentBar, queuedChanges, room.currentPlayer, audio]);
+  }, [audio.currentBar, queuedChanges, room.currentPlayer, audio, room]);
 
   // Handle loop toggle with audio sync
   const handleLoopToggle = (loopId: string, active: boolean) => {

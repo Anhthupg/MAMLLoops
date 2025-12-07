@@ -62,6 +62,14 @@ function lcmArray(arr: number[]): number {
   return arr.reduce((acc, val) => lcm(acc, val), arr[0]);
 }
 
+// Subdivision options for note duration
+const SUBDIVISIONS = [
+  { label: '1/4', value: '4n', beats: 1, quantize: 1 },
+  { label: '1/8', value: '8n', beats: 0.5, quantize: 2 },
+  { label: '1/16', value: '16n', beats: 0.25, quantize: 4 },
+  { label: '1/32', value: '32n', beats: 0.125, quantize: 8 },
+] as const;
+
 export function TimelineView({
   loops,
   currentBar: _currentBar,
@@ -75,6 +83,7 @@ export function TimelineView({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number>(0);
   const [hoveredTrack, setHoveredTrack] = useState<string | null>(null);
+  const [subdivision, setSubdivision] = useState<typeof SUBDIVISIONS[number]>(SUBDIVISIONS[1]); // Default 1/8
 
   // Constants
   const BEATS_PER_BAR = 4;
@@ -216,19 +225,27 @@ export function TimelineView({
       ctx.font = '9px monospace';
       ctx.fillText(`${loop.bars}b`, 6, trackY + 28);
 
-      // Queued change indicator
-      if (hasQueuedChange) {
-        ctx.fillStyle = '#f59e0b';
-        ctx.font = '8px monospace';
-        ctx.fillText('QUEUED', 6, trackY + trackHeight - 6);
-      }
-
       // Current position within THIS loop
       const loopPosition = cycleBeats % loopBeats;
       const loopBar = Math.floor(loopPosition / BEATS_PER_BAR) + 1;
       ctx.fillStyle = isActive ? loop.color : '#444';
       ctx.font = '9px monospace';
       ctx.fillText(`${loopBar}/${loop.bars}`, 6, trackY + 40);
+
+      // Queued change indicator with countdown
+      if (hasQueuedChange) {
+        // Calculate bars until change applies
+        const currentGlobalBar = Math.floor(totalBeats / BEATS_PER_BAR);
+        const barsUntilChange = Math.max(0, queuedChange.applyAtBar - currentGlobalBar);
+
+        // Pulsing effect
+        const pulse = Math.sin(Date.now() / 200) * 0.3 + 0.7;
+        ctx.globalAlpha = pulse;
+        ctx.fillStyle = '#f59e0b';
+        ctx.font = 'bold 9px monospace';
+        ctx.fillText(`IN ${barsUntilChange}`, 6, trackY + trackHeight - 6);
+        ctx.globalAlpha = 1;
+      }
 
       // === GRID ===
       // Draw beat grid lines
@@ -437,15 +454,17 @@ export function TimelineView({
     const loop = loops[trackIndex];
     if (!editableLoopIds.includes(loop.id)) return;
 
-    const loopBeats = loop.bars * 4;
+    const loopBeats = loop.bars * BEATS_PER_BAR;
 
-    // Calculate beat position
+    // Calculate beat position within the mother loop
     const timelineX = x - trackLabelWidth;
     const motherBeat = (timelineX / timelineWidth) * motherLoopBeats;
+    // Convert to position within this loop's pattern (modulo loop length)
     const beatInLoop = motherBeat % loopBeats;
-    const quantizedBeat = Math.round(beatInLoop * 2) / 2; // Quantize to 8th notes
+    // Quantize based on current subdivision
+    const quantizedBeat = Math.round(beatInLoop * subdivision.quantize) / subdivision.quantize;
 
-    // Calculate pitch
+    // Calculate pitch from Y position
     const trackY = headerHeight + trackIndex * trackHeight;
     const relativeY = y - trackY;
     const pitchNormalized = 1 - (relativeY / trackHeight);
@@ -455,29 +474,32 @@ export function TimelineView({
 
     // Use queued pattern if exists, otherwise current pattern
     const queuedChange = getQueuedPattern(loop.id);
-    const basePattern = queuedChange ? queuedChange.pattern : loop.pattern;
+    const basePattern = queuedChange ? queuedChange.pattern : (loop.pattern || []);
 
-    // Toggle note
-    const tolerance = 0.25;
+    // Toggle note - look for existing note at this time/pitch
+    const timeTolerance = 0.3; // Slightly larger tolerance for easier clicking
+    const pitchTolerance = 4; // Allow some vertical tolerance
     const existingIndex = basePattern.findIndex(n =>
-      Math.abs(n.time - quantizedBeat) < tolerance &&
-      Math.abs(noteToPitch(n.note) - clampedPitch) < 3
+      Math.abs(n.time - quantizedBeat) < timeTolerance &&
+      Math.abs(noteToPitch(n.note) - clampedPitch) < pitchTolerance
     );
 
     let newPattern: NoteEvent[];
     if (existingIndex >= 0) {
+      // Remove the existing note
       newPattern = basePattern.filter((_, i) => i !== existingIndex);
     } else {
+      // Add a new note with the selected subdivision's duration
       newPattern = [...basePattern, {
         note,
         time: quantizedBeat,
-        duration: '8n',
+        duration: subdivision.value,
         velocity: 0.8
       }].sort((a, b) => a.time - b.time);
     }
 
     onPatternChange(loop.id, newPattern);
-  }, [loops, editableLoopIds, onPatternChange, motherLoopBeats, getQueuedPattern]);
+  }, [loops, editableLoopIds, onPatternChange, motherLoopBeats, getQueuedPattern, BEATS_PER_BAR, subdivision]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -504,20 +526,56 @@ export function TimelineView({
   }, [draw]);
 
   return (
-    <canvas
-      ref={canvasRef}
-      onMouseMove={handleMouseMove}
-      onMouseLeave={handleMouseLeave}
-      onClick={handleClick}
-      style={{
-        width: '100%',
-        height: '100%',
-        flex: 1,
-        minHeight: 0,
-        display: 'block',
-        background: '#0a0a0f',
-        cursor: editableLoopIds.length > 0 ? 'crosshair' : 'default',
-      }}
-    />
+    <div style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
+      {/* Subdivision selector */}
+      <div style={{
+        position: 'absolute',
+        top: 8,
+        right: 120,
+        display: 'flex',
+        gap: 4,
+        zIndex: 10,
+        background: 'rgba(10, 10, 15, 0.9)',
+        padding: '4px 8px',
+        borderRadius: 6,
+        border: '1px solid #252542',
+      }}>
+        <span style={{ fontSize: 10, color: '#666', marginRight: 4, alignSelf: 'center' }}>Grid:</span>
+        {SUBDIVISIONS.map(sub => (
+          <button
+            key={sub.value}
+            onClick={() => setSubdivision(sub)}
+            style={{
+              background: subdivision.value === sub.value ? '#4ade80' : '#252542',
+              color: subdivision.value === sub.value ? '#000' : '#999',
+              border: 'none',
+              borderRadius: 4,
+              padding: '4px 8px',
+              fontSize: 11,
+              fontFamily: 'monospace',
+              cursor: 'pointer',
+              fontWeight: subdivision.value === sub.value ? 'bold' : 'normal',
+            }}
+          >
+            {sub.label}
+          </button>
+        ))}
+      </div>
+      <canvas
+        ref={canvasRef}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={handleMouseLeave}
+        onClick={handleClick}
+        style={{
+          width: '100%',
+          height: '100%',
+          flex: 1,
+          minHeight: 0,
+          display: 'block',
+          background: '#0a0a0f',
+          cursor: editableLoopIds.length > 0 ? 'crosshair' : 'default',
+        }}
+      />
+    </div>
   );
 }

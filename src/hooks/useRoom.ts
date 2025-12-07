@@ -93,6 +93,12 @@ export function useRoom() {
     }
   }, []);
 
+  const updateLoopPattern = useCallback((loopId: string, pattern: import('../types').NoteEvent[]) => {
+    if (syncRef.current) {
+      syncRef.current.updateLoopPattern(loopId, pattern);
+    }
+  }, []);
+
   const queueSection = useCallback((sectionIndex: number) => {
     if (syncRef.current) {
       syncRef.current.queueSection(sectionIndex);
@@ -171,6 +177,7 @@ export function useRoom() {
     joinRoom,
     leaveRoom,
     triggerLoop,
+    updateLoopPattern,
     queueSection,
     changeSection,
     updateTransport,
