@@ -493,10 +493,10 @@ export function OrbitalView({
     if (!canvas) return;
 
     const resize = () => {
-      const container = canvas.parentElement;
-      if (container) {
-        canvas.width = container.clientWidth;
-        canvas.height = container.clientHeight;
+      const rect = canvas.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) {
+        canvas.width = rect.width;
+        canvas.height = rect.height;
       }
     };
 
@@ -519,6 +519,8 @@ export function OrbitalView({
       style={{
         width: '100%',
         height: '100%',
+        flex: 1,
+        minHeight: 0,
         display: 'block',
         background: '#0a0a0f',
         cursor: editableLoopIds.length > 0 ? 'crosshair' : 'default',
