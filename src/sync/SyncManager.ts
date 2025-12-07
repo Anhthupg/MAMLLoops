@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import Peer from 'peerjs';
-import type { RoomState, Player, SyncMessage, Loop, Section } from '../types';
+import type { RoomState, Player, SyncMessage, Loop, Section, NoteEvent } from '../types';
 
 type MessageHandler = (message: SyncMessage) => void;
 type ConnectionStatusHandler = (connected: boolean, peerCount: number) => void;
@@ -208,11 +208,55 @@ class PeerSync {
   }
 }
 
+// Glass-inspired default patterns
+const GLASS_PATTERN_4: NoteEvent[] = [
+  { note: 'C4', time: 0, duration: '8n' },
+  { note: 'E4', time: 0.5, duration: '8n' },
+  { note: 'G4', time: 1, duration: '8n' },
+  { note: 'B4', time: 1.5, duration: '8n' },
+  { note: 'C5', time: 2, duration: '8n' },
+  { note: 'B4', time: 2.5, duration: '8n' },
+  { note: 'G4', time: 3, duration: '8n' },
+  { note: 'E4', time: 3.5, duration: '8n' },
+];
+
+const GLASS_PATTERN_5: NoteEvent[] = [
+  { note: 'D4', time: 0, duration: '8n' },
+  { note: 'F#4', time: 0.5, duration: '8n' },
+  { note: 'A4', time: 1, duration: '8n' },
+  { note: 'C5', time: 1.5, duration: '8n' },
+  { note: 'E5', time: 2, duration: '8n' },
+  { note: 'C5', time: 2.5, duration: '8n' },
+  { note: 'A4', time: 3, duration: '8n' },
+  { note: 'F#4', time: 3.5, duration: '8n' },
+  { note: 'D4', time: 4, duration: '8n' },
+  { note: 'A3', time: 4.5, duration: '8n' },
+];
+
+const GLASS_PATTERN_8: NoteEvent[] = [
+  { note: 'A3', time: 0, duration: '8n' },
+  { note: 'E4', time: 0.5, duration: '8n' },
+  { note: 'A4', time: 1, duration: '8n' },
+  { note: 'C5', time: 1.5, duration: '8n' },
+  { note: 'E5', time: 2, duration: '8n' },
+  { note: 'A5', time: 2.5, duration: '8n' },
+  { note: 'E5', time: 3, duration: '8n' },
+  { note: 'C5', time: 3.5, duration: '8n' },
+  { note: 'A4', time: 4, duration: '8n' },
+  { note: 'E4', time: 4.5, duration: '8n' },
+  { note: 'C4', time: 5, duration: '8n' },
+  { note: 'E4', time: 5.5, duration: '8n' },
+  { note: 'A4', time: 6, duration: '8n' },
+  { note: 'C5', time: 6.5, duration: '8n' },
+  { note: 'E5', time: 7, duration: '8n' },
+  { note: 'A5', time: 7.5, duration: '8n' },
+];
+
 // Default loops for new players
 const DEFAULT_LOOPS: Omit<Loop, 'id'>[] = [
-  { name: 'Glass 4', bars: 4, color: '#f472b6', pattern: [], volume: 0.7, muted: true },
-  { name: 'Glass 5', bars: 5, color: '#60a5fa', pattern: [], volume: 0.7, muted: true },
-  { name: 'Glass 8', bars: 8, color: '#4ade80', pattern: [], volume: 0.7, muted: true },
+  { name: 'Glass 4', bars: 4, color: '#f472b6', pattern: GLASS_PATTERN_4, volume: 0.7, muted: true, instrument: 'synth' },
+  { name: 'Glass 5', bars: 5, color: '#60a5fa', pattern: GLASS_PATTERN_5, volume: 0.7, muted: true, instrument: 'synth' },
+  { name: 'Glass 8', bars: 8, color: '#4ade80', pattern: GLASS_PATTERN_8, volume: 0.7, muted: true, instrument: 'synth' },
 ];
 
 // Default sections
@@ -251,6 +295,7 @@ export class SyncManager {
       currentBar: 0,
       isPlaying: false,
       leaderId: this.playerId,
+      maxPlayers: 10,
     };
 
     // Listen for sync messages
@@ -340,9 +385,10 @@ export class SyncManager {
     }
   }
 
-  // Update transport state
+  // Update transport state with clock sync
   updateTransport(isPlaying: boolean, tempo: number, beat: number, bar: number): void {
     if (this.isLeader()) {
+      const now = performance.now();
       this.sync.send({
         type: 'transport',
         state: {
@@ -351,9 +397,40 @@ export class SyncManager {
           currentBeat: beat,
           currentBar: bar,
           timeSignature: [4, 4],
+          serverTime: now,
+          startTime: this.state.startTime || now,
         },
       });
     }
+  }
+
+  // Send clock sync to all peers (leader only)
+  sendClockSync(transportPosition: number): void {
+    if (this.isLeader()) {
+      this.sync.send({
+        type: 'clock_sync',
+        clock: {
+          leaderTime: performance.now(),
+          transportPosition,
+          tempo: this.state.tempo,
+        },
+      });
+    }
+  }
+
+  // Measure latency to all peers
+  pingPeers(): void {
+    this.sync.send({ type: 'ping', sendTime: performance.now() });
+  }
+
+  // Update a loop's pattern
+  updateLoopPattern(loopId: string, pattern: NoteEvent[]): void {
+    this.sync.send({
+      type: 'loop_update',
+      playerId: this.playerId,
+      loopId,
+      pattern,
+    });
   }
 
   // Set player ready state
@@ -422,9 +499,62 @@ export class SyncManager {
       case 'ready':
         this.handleReady(message.playerId, message.ready);
         break;
+      case 'clock_sync':
+        // Sync local clock to leader's clock
+        if (!this.isHostFlag) {
+          this.handleClockSync(message.clock);
+        }
+        break;
+      case 'ping':
+        // Respond with pong for latency measurement
+        this.sync.send({
+          type: 'pong',
+          sendTime: message.sendTime,
+          receiveTime: performance.now(),
+        });
+        break;
+      case 'pong':
+        // Calculate round-trip latency
+        this.handlePong(message.sendTime, message.receiveTime);
+        break;
+      case 'loop_update':
+        this.handleLoopUpdate(message.playerId, message.loopId, message.pattern);
+        break;
     }
 
     this.notifyListeners();
+  }
+
+  private handleClockSync(clock: { leaderTime: number; transportPosition: number; tempo: number }): void {
+    // Store clock offset for synchronization
+    const localTime = performance.now();
+    const clockOffset = localTime - clock.leaderTime;
+    console.log(`Clock sync: offset=${clockOffset.toFixed(2)}ms`);
+    // Audio engine can use this to adjust timing
+  }
+
+  private handlePong(sendTime: number, _receiveTime: number): void {
+    const now = performance.now();
+    const roundTrip = now - sendTime;
+    const latency = roundTrip / 2;
+    console.log(`Latency: ${latency.toFixed(2)}ms (RTT: ${roundTrip.toFixed(2)}ms)`);
+  }
+
+  private handleLoopUpdate(playerId: string, loopId: string, pattern: NoteEvent[]): void {
+    this.state = {
+      ...this.state,
+      players: this.state.players.map((p) => {
+        if (p.id === playerId) {
+          return {
+            ...p,
+            loops: p.loops.map((l) =>
+              l.id === loopId ? { ...l, pattern } : l
+            ),
+          };
+        }
+        return p;
+      }),
+    };
   }
 
   private handleJoin(player: Player): void {
