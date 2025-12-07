@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react';
-import { OrbitalView } from './components/OrbitalView';
 import { TimelineView } from './components/TimelineView';
 import { LoopPadGrid } from './components/LoopPad';
 import { SectionBar } from './components/SectionBar';
@@ -11,12 +10,9 @@ import { useRoom } from './hooks/useRoom';
 import type { Loop, NoteEvent } from './types';
 import './App.css';
 
-type ViewMode = 'orbital' | 'timeline';
-
 function App() {
   const [isInRoom, setIsInRoom] = useState(false);
   const [editingLoop, setEditingLoop] = useState<Loop | null>(null);
-  const [viewMode, setViewMode] = useState<ViewMode>('orbital');
 
   const audio = useAudioEngine();
   const room = useRoom();
@@ -60,13 +56,6 @@ function App() {
       p.loops.filter((l) => !l.muted)
     );
   }, [room.roomState]);
-
-  // Calculate realignment bar
-  const realignmentBar = useMemo(() => {
-    const activeBars = allLoops.map((l) => l.bars);
-    if (activeBars.length === 0) return 0;
-    return audio.calculateRealignment(activeBars);
-  }, [allLoops, audio]);
 
   // Handle loop toggle with audio sync
   const handleLoopToggle = (loopId: string, active: boolean) => {
@@ -134,41 +123,15 @@ function App() {
 
       <main className="app-main">
         <div className="visualization-panel">
-          <div className="view-toggle">
-            <button
-              className={`view-toggle-btn ${viewMode === 'orbital' ? 'active' : ''}`}
-              onClick={() => setViewMode('orbital')}
-            >
-              Orbital
-            </button>
-            <button
-              className={`view-toggle-btn ${viewMode === 'timeline' ? 'active' : ''}`}
-              onClick={() => setViewMode('timeline')}
-            >
-              Timeline
-            </button>
-          </div>
-          {viewMode === 'orbital' ? (
-            <OrbitalView
-              loops={allLoops}
-              currentBar={audio.currentBar}
-              isPlaying={audio.isPlaying}
-              tempo={audio.tempo}
-              realignmentBar={realignmentBar}
-              onPatternChange={handlePatternChange}
-              editableLoopIds={currentPlayer?.loops.map(l => l.id)}
-            />
-          ) : (
-            <TimelineView
-              loops={allLoops}
-              currentBar={audio.currentBar}
-              currentBeat={audio.currentBeat}
-              isPlaying={audio.isPlaying}
-              tempo={audio.tempo}
-              onPatternChange={handlePatternChange}
-              editableLoopIds={currentPlayer?.loops.map(l => l.id)}
-            />
-          )}
+          <TimelineView
+            loops={allLoops}
+            currentBar={audio.currentBar}
+            currentBeat={audio.currentBeat}
+            isPlaying={audio.isPlaying}
+            tempo={audio.tempo}
+            onPatternChange={handlePatternChange}
+            editableLoopIds={currentPlayer?.loops.map(l => l.id)}
+          />
         </div>
 
         <div className="controls-panel">

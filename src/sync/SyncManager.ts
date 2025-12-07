@@ -209,47 +209,102 @@ class PeerSync {
 }
 
 // Glass-inspired default patterns
+// Each pattern fills its full loop length with 8th notes (2 notes per beat, 8 notes per bar)
+// 4-bar loop = 16 beats = 32 eighth notes
 const GLASS_PATTERN_4: NoteEvent[] = [
-  { note: 'C4', time: 0, duration: '8n' },
-  { note: 'E4', time: 0.5, duration: '8n' },
-  { note: 'G4', time: 1, duration: '8n' },
-  { note: 'B4', time: 1.5, duration: '8n' },
-  { note: 'C5', time: 2, duration: '8n' },
-  { note: 'B4', time: 2.5, duration: '8n' },
-  { note: 'G4', time: 3, duration: '8n' },
-  { note: 'E4', time: 3.5, duration: '8n' },
+  // Bar 1
+  { note: 'C4', time: 0, duration: '8n' }, { note: 'E4', time: 0.5, duration: '8n' },
+  { note: 'G4', time: 1, duration: '8n' }, { note: 'B4', time: 1.5, duration: '8n' },
+  { note: 'C5', time: 2, duration: '8n' }, { note: 'B4', time: 2.5, duration: '8n' },
+  { note: 'G4', time: 3, duration: '8n' }, { note: 'E4', time: 3.5, duration: '8n' },
+  // Bar 2
+  { note: 'C4', time: 4, duration: '8n' }, { note: 'E4', time: 4.5, duration: '8n' },
+  { note: 'G4', time: 5, duration: '8n' }, { note: 'B4', time: 5.5, duration: '8n' },
+  { note: 'C5', time: 6, duration: '8n' }, { note: 'B4', time: 6.5, duration: '8n' },
+  { note: 'G4', time: 7, duration: '8n' }, { note: 'E4', time: 7.5, duration: '8n' },
+  // Bar 3
+  { note: 'C4', time: 8, duration: '8n' }, { note: 'E4', time: 8.5, duration: '8n' },
+  { note: 'G4', time: 9, duration: '8n' }, { note: 'B4', time: 9.5, duration: '8n' },
+  { note: 'C5', time: 10, duration: '8n' }, { note: 'B4', time: 10.5, duration: '8n' },
+  { note: 'G4', time: 11, duration: '8n' }, { note: 'E4', time: 11.5, duration: '8n' },
+  // Bar 4
+  { note: 'C4', time: 12, duration: '8n' }, { note: 'E4', time: 12.5, duration: '8n' },
+  { note: 'G4', time: 13, duration: '8n' }, { note: 'B4', time: 13.5, duration: '8n' },
+  { note: 'C5', time: 14, duration: '8n' }, { note: 'B4', time: 14.5, duration: '8n' },
+  { note: 'G4', time: 15, duration: '8n' }, { note: 'E4', time: 15.5, duration: '8n' },
 ];
 
+// 5-bar loop = 20 beats = 40 eighth notes
 const GLASS_PATTERN_5: NoteEvent[] = [
-  { note: 'D4', time: 0, duration: '8n' },
-  { note: 'F#4', time: 0.5, duration: '8n' },
-  { note: 'A4', time: 1, duration: '8n' },
-  { note: 'C5', time: 1.5, duration: '8n' },
-  { note: 'E5', time: 2, duration: '8n' },
-  { note: 'C5', time: 2.5, duration: '8n' },
-  { note: 'A4', time: 3, duration: '8n' },
-  { note: 'F#4', time: 3.5, duration: '8n' },
-  { note: 'D4', time: 4, duration: '8n' },
-  { note: 'A3', time: 4.5, duration: '8n' },
+  // Bar 1
+  { note: 'D4', time: 0, duration: '8n' }, { note: 'F#4', time: 0.5, duration: '8n' },
+  { note: 'A4', time: 1, duration: '8n' }, { note: 'C5', time: 1.5, duration: '8n' },
+  { note: 'E5', time: 2, duration: '8n' }, { note: 'C5', time: 2.5, duration: '8n' },
+  { note: 'A4', time: 3, duration: '8n' }, { note: 'F#4', time: 3.5, duration: '8n' },
+  // Bar 2
+  { note: 'D4', time: 4, duration: '8n' }, { note: 'A3', time: 4.5, duration: '8n' },
+  { note: 'D4', time: 5, duration: '8n' }, { note: 'F#4', time: 5.5, duration: '8n' },
+  { note: 'A4', time: 6, duration: '8n' }, { note: 'C5', time: 6.5, duration: '8n' },
+  { note: 'E5', time: 7, duration: '8n' }, { note: 'C5', time: 7.5, duration: '8n' },
+  // Bar 3
+  { note: 'A4', time: 8, duration: '8n' }, { note: 'F#4', time: 8.5, duration: '8n' },
+  { note: 'D4', time: 9, duration: '8n' }, { note: 'A3', time: 9.5, duration: '8n' },
+  { note: 'D4', time: 10, duration: '8n' }, { note: 'F#4', time: 10.5, duration: '8n' },
+  { note: 'A4', time: 11, duration: '8n' }, { note: 'C5', time: 11.5, duration: '8n' },
+  // Bar 4
+  { note: 'E5', time: 12, duration: '8n' }, { note: 'C5', time: 12.5, duration: '8n' },
+  { note: 'A4', time: 13, duration: '8n' }, { note: 'F#4', time: 13.5, duration: '8n' },
+  { note: 'D4', time: 14, duration: '8n' }, { note: 'A3', time: 14.5, duration: '8n' },
+  { note: 'D4', time: 15, duration: '8n' }, { note: 'F#4', time: 15.5, duration: '8n' },
+  // Bar 5
+  { note: 'A4', time: 16, duration: '8n' }, { note: 'C5', time: 16.5, duration: '8n' },
+  { note: 'E5', time: 17, duration: '8n' }, { note: 'C5', time: 17.5, duration: '8n' },
+  { note: 'A4', time: 18, duration: '8n' }, { note: 'F#4', time: 18.5, duration: '8n' },
+  { note: 'D4', time: 19, duration: '8n' }, { note: 'A3', time: 19.5, duration: '8n' },
 ];
 
+// 8-bar loop = 32 beats = 64 eighth notes
 const GLASS_PATTERN_8: NoteEvent[] = [
-  { note: 'A3', time: 0, duration: '8n' },
-  { note: 'E4', time: 0.5, duration: '8n' },
-  { note: 'A4', time: 1, duration: '8n' },
-  { note: 'C5', time: 1.5, duration: '8n' },
-  { note: 'E5', time: 2, duration: '8n' },
-  { note: 'A5', time: 2.5, duration: '8n' },
-  { note: 'E5', time: 3, duration: '8n' },
-  { note: 'C5', time: 3.5, duration: '8n' },
-  { note: 'A4', time: 4, duration: '8n' },
-  { note: 'E4', time: 4.5, duration: '8n' },
-  { note: 'C4', time: 5, duration: '8n' },
-  { note: 'E4', time: 5.5, duration: '8n' },
-  { note: 'A4', time: 6, duration: '8n' },
-  { note: 'C5', time: 6.5, duration: '8n' },
-  { note: 'E5', time: 7, duration: '8n' },
-  { note: 'A5', time: 7.5, duration: '8n' },
+  // Bar 1
+  { note: 'A3', time: 0, duration: '8n' }, { note: 'E4', time: 0.5, duration: '8n' },
+  { note: 'A4', time: 1, duration: '8n' }, { note: 'C5', time: 1.5, duration: '8n' },
+  { note: 'E5', time: 2, duration: '8n' }, { note: 'A5', time: 2.5, duration: '8n' },
+  { note: 'E5', time: 3, duration: '8n' }, { note: 'C5', time: 3.5, duration: '8n' },
+  // Bar 2
+  { note: 'A4', time: 4, duration: '8n' }, { note: 'E4', time: 4.5, duration: '8n' },
+  { note: 'C4', time: 5, duration: '8n' }, { note: 'E4', time: 5.5, duration: '8n' },
+  { note: 'A4', time: 6, duration: '8n' }, { note: 'C5', time: 6.5, duration: '8n' },
+  { note: 'E5', time: 7, duration: '8n' }, { note: 'A5', time: 7.5, duration: '8n' },
+  // Bar 3
+  { note: 'A3', time: 8, duration: '8n' }, { note: 'E4', time: 8.5, duration: '8n' },
+  { note: 'A4', time: 9, duration: '8n' }, { note: 'C5', time: 9.5, duration: '8n' },
+  { note: 'E5', time: 10, duration: '8n' }, { note: 'A5', time: 10.5, duration: '8n' },
+  { note: 'E5', time: 11, duration: '8n' }, { note: 'C5', time: 11.5, duration: '8n' },
+  // Bar 4
+  { note: 'A4', time: 12, duration: '8n' }, { note: 'E4', time: 12.5, duration: '8n' },
+  { note: 'C4', time: 13, duration: '8n' }, { note: 'E4', time: 13.5, duration: '8n' },
+  { note: 'A4', time: 14, duration: '8n' }, { note: 'C5', time: 14.5, duration: '8n' },
+  { note: 'E5', time: 15, duration: '8n' }, { note: 'A5', time: 15.5, duration: '8n' },
+  // Bar 5
+  { note: 'A3', time: 16, duration: '8n' }, { note: 'E4', time: 16.5, duration: '8n' },
+  { note: 'A4', time: 17, duration: '8n' }, { note: 'C5', time: 17.5, duration: '8n' },
+  { note: 'E5', time: 18, duration: '8n' }, { note: 'A5', time: 18.5, duration: '8n' },
+  { note: 'E5', time: 19, duration: '8n' }, { note: 'C5', time: 19.5, duration: '8n' },
+  // Bar 6
+  { note: 'A4', time: 20, duration: '8n' }, { note: 'E4', time: 20.5, duration: '8n' },
+  { note: 'C4', time: 21, duration: '8n' }, { note: 'E4', time: 21.5, duration: '8n' },
+  { note: 'A4', time: 22, duration: '8n' }, { note: 'C5', time: 22.5, duration: '8n' },
+  { note: 'E5', time: 23, duration: '8n' }, { note: 'A5', time: 23.5, duration: '8n' },
+  // Bar 7
+  { note: 'A3', time: 24, duration: '8n' }, { note: 'E4', time: 24.5, duration: '8n' },
+  { note: 'A4', time: 25, duration: '8n' }, { note: 'C5', time: 25.5, duration: '8n' },
+  { note: 'E5', time: 26, duration: '8n' }, { note: 'A5', time: 26.5, duration: '8n' },
+  { note: 'E5', time: 27, duration: '8n' }, { note: 'C5', time: 27.5, duration: '8n' },
+  // Bar 8
+  { note: 'A4', time: 28, duration: '8n' }, { note: 'E4', time: 28.5, duration: '8n' },
+  { note: 'C4', time: 29, duration: '8n' }, { note: 'E4', time: 29.5, duration: '8n' },
+  { note: 'A4', time: 30, duration: '8n' }, { note: 'C5', time: 30.5, duration: '8n' },
+  { note: 'E5', time: 31, duration: '8n' }, { note: 'A5', time: 31.5, duration: '8n' },
 ];
 
 // Default loops for new players

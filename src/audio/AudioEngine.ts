@@ -125,15 +125,18 @@ export class AudioEngine {
     synth.volume.value = Tone.gainToDb(loop.volume);
     this.synths.set(loop.id, synth);
 
-    // Calculate the loop duration in bars
+    // Calculate the loop duration in bars (use "Xm" notation for Tone.js)
     const loopDuration = `${loop.bars}m`;
-    const loopDurationBeats = loop.bars * this.beatsPerBar;
 
     // Use the loop's actual pattern if it has one, otherwise fall back to arpeggio
     if (loop.pattern && loop.pattern.length > 0) {
       // Create Part for precise timing with custom pattern
-      type PartEvent = { time: number; note: NoteEvent };
-      const partEvents: PartEvent[] = loop.pattern.map(n => ({ time: n.time, note: n }));
+      // Convert beat times to Tone.js time notation (numbers are interpreted as seconds!)
+      type PartEvent = { time: string; note: NoteEvent };
+      const partEvents: PartEvent[] = loop.pattern.map(n => ({
+        time: this.beatsToToneTime(n.time),
+        note: n
+      }));
       const part = new Tone.Part<PartEvent>((time, event) => {
         if (!loop.muted) {
           synth.triggerAttackRelease(
@@ -146,7 +149,7 @@ export class AudioEngine {
       }, partEvents);
 
       part.loop = true;
-      part.loopEnd = loopDurationBeats; // in beats
+      part.loopEnd = loopDuration; // Use "Xm" notation (bars) for Tone.js
       this.sequences.set(loop.id, part as unknown as Tone.Sequence);
     } else {
       // Fall back to default arpeggio pattern
@@ -164,7 +167,8 @@ export class AudioEngine {
       );
 
       sequence.loop = true;
-      sequence.loopEnd = Tone.Time(loopDuration).toSeconds();
+      // Use bar notation - Tone.js accepts string but TypeScript types are incomplete
+      (sequence as any).loopEnd = loopDuration;
       this.sequences.set(loop.id, sequence);
     }
   }
@@ -226,17 +230,20 @@ export class AudioEngine {
       oldSequence.dispose();
 
       // Create new sequence with the pattern
-      // Use a Part for precise timing based on pattern.time values
-      type PartEvent = { time: number; note: NoteEvent };
-      const partEvents: PartEvent[] = pattern.map(n => ({ time: n.time, note: n }));
+      // Convert beat times to Tone.js time notation (numbers are interpreted as seconds!)
+      type PartEvent = { time: string; note: NoteEvent };
+      const partEvents: PartEvent[] = pattern.map(n => ({
+        time: this.beatsToToneTime(n.time),
+        note: n
+      }));
       const part = new Tone.Part<PartEvent>((time, event) => {
         synth.triggerAttackRelease(event.note.note, event.note.duration, time, event.note.velocity || 0.8);
       }, partEvents);
 
-      // Configure looping
-      const loopDuration = this.getLoopDurationFromPattern(pattern);
+      // Configure looping - use "Xm" notation for Tone.js
+      const loopBars = this.getLoopBarsFromPattern(pattern);
       part.loop = true;
-      part.loopEnd = loopDuration;
+      part.loopEnd = `${loopBars}m`;
 
       this.sequences.set(loopId, part as unknown as Tone.Sequence);
 
@@ -247,13 +254,22 @@ export class AudioEngine {
     }
   }
 
-  // Estimate loop duration from pattern (find max time + some buffer)
-  private getLoopDurationFromPattern(pattern: NoteEvent[]): number {
-    if (pattern.length === 0) return 4; // Default 4 beats
+  // Estimate loop bars from pattern (find max time and round to bars)
+  private getLoopBarsFromPattern(pattern: NoteEvent[]): number {
+    if (pattern.length === 0) return 1; // Default 1 bar
     const maxTime = Math.max(...pattern.map(n => n.time));
-    // Round up to next bar
-    const bars = Math.ceil((maxTime + 1) / 4);
-    return bars * 4; // beats
+    // Round up to next bar (4 beats per bar)
+    return Math.ceil((maxTime + 1) / 4);
+  }
+
+  // Convert beats to Tone.js time notation (bars:beats:sixteenths)
+  // Raw numbers in Tone.js are interpreted as seconds, so we need string notation
+  private beatsToToneTime(beats: number): string {
+    const bars = Math.floor(beats / this.beatsPerBar);
+    const remainingBeats = beats % this.beatsPerBar;
+    const wholeBeat = Math.floor(remainingBeats);
+    const sixteenths = (remainingBeats - wholeBeat) * 4; // 4 sixteenths per beat
+    return `${bars}:${wholeBeat}:${sixteenths}`;
   }
 
   // Get current position within a specific loop (for visualization)

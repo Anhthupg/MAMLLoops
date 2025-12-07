@@ -1,4 +1,5 @@
 import { useRef, useEffect, useCallback, useState } from 'react';
+import * as Tone from 'tone';
 import type { Loop, NoteEvent } from '../types';
 
 interface TimelineViewProps {
@@ -40,8 +41,11 @@ function pitchToNote(pitch: number): string {
 }
 
 // Calculate LCM
+function gcd(a: number, b: number): number {
+  return b === 0 ? a : gcd(b, a % b);
+}
+
 function lcm(a: number, b: number): number {
-  const gcd = (x: number, y: number): number => (y === 0 ? x : gcd(y, x % y));
   return (a * b) / gcd(a, b);
 }
 
@@ -50,16 +54,10 @@ function lcmArray(arr: number[]): number {
   return arr.reduce((acc, val) => lcm(acc, val), arr[0]);
 }
 
-// Check if note is a black key
-function isBlackKey(pitch: number): boolean {
-  const note = pitch % 12;
-  return [1, 3, 6, 8, 10].includes(note);
-}
-
 export function TimelineView({
   loops,
-  currentBar,
-  currentBeat,
+  currentBar: _currentBar,
+  currentBeat: _currentBeat,
   isPlaying,
   tempo,
   onPatternChange,
@@ -69,18 +67,16 @@ export function TimelineView({
   const animationRef = useRef<number>(0);
   const [hoveredTrack, setHoveredTrack] = useState<string | null>(null);
 
+  // Constants
+  const BEATS_PER_BAR = 4;
+
   // Calculate mother loop (LCM of all loop lengths)
   const activeLoops = loops.filter(l => !l.muted);
   const loopBars = activeLoops.length > 0
     ? activeLoops.map(l => l.bars)
     : loops.map(l => l.bars);
   const motherLoopBars = loopBars.length > 0 ? lcmArray(loopBars) : 1;
-  const beatsPerBar = 4;
-  const motherLoopBeats = motherLoopBars * beatsPerBar;
-
-  // Current position
-  const currentPosition = currentBar * beatsPerBar + currentBeat;
-  const cyclePosition = currentPosition % motherLoopBeats;
+  const motherLoopBeats = motherLoopBars * BEATS_PER_BAR;
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
@@ -90,185 +86,147 @@ export function TimelineView({
     if (!ctx) return;
 
     const { width, height } = canvas;
-    const pianoWidth = 50;
-    const headerHeight = 60;
-    const trackLabelWidth = 80;
-    const timelineWidth = width - pianoWidth - trackLabelWidth;
+    const headerHeight = 50;
+    const trackLabelWidth = 100;
+    const timelineWidth = width - trackLabelWidth;
     const timelineHeight = height - headerHeight;
+
+    // Get current position directly from Tone.js Transport
+    // Transport.seconds gives us exact playback position
+    const transportSeconds = Tone.getTransport().seconds;
+    const bpm = Tone.getTransport().bpm.value;
+
+    // Convert seconds to beats: beats = seconds * (bpm / 60)
+    const totalBeats = transportSeconds * (bpm / 60);
+
+    // Position within the mother loop cycle
+    const cycleBeats = totalBeats % motherLoopBeats;
 
     // Clear
     ctx.fillStyle = '#0a0a0f';
     ctx.fillRect(0, 0, width, height);
 
-    // === HEADER: Mother loop progress bar ===
+    // === HEADER ===
     ctx.fillStyle = '#1a1a2e';
     ctx.fillRect(0, 0, width, headerHeight);
 
-    // Mother loop label
+    // Title and info
     ctx.fillStyle = '#888';
     ctx.font = '11px monospace';
     ctx.textAlign = 'left';
-    ctx.fillText('MOTHER LOOP', 10, 18);
-    ctx.fillStyle = '#666';
-    ctx.font = '10px monospace';
-    ctx.fillText(`${motherLoopBars} bars (LCM)`, 10, 32);
+    ctx.fillText(`Mother Loop: ${motherLoopBars} bars (${motherLoopBeats} beats)`, 10, 20);
 
-    // Progress bar background
-    const progressBarX = pianoWidth + trackLabelWidth;
-    const progressBarY = 15;
-    const progressBarHeight = 30;
-    ctx.fillStyle = '#252542';
-    ctx.fillRect(progressBarX, progressBarY, timelineWidth, progressBarHeight);
-
-    // Progress bar fill
-    const progress = cyclePosition / motherLoopBeats;
-    ctx.fillStyle = '#4ade80';
-    ctx.fillRect(progressBarX, progressBarY, timelineWidth * progress, progressBarHeight);
-
-    // Bar markers on progress bar
-    for (let bar = 0; bar <= motherLoopBars; bar++) {
-      const x = progressBarX + (bar / motherLoopBars) * timelineWidth;
-      ctx.beginPath();
-      ctx.moveTo(x, progressBarY);
-      ctx.lineTo(x, progressBarY + progressBarHeight);
-      ctx.strokeStyle = bar === 0 ? '#fff' : '#444';
-      ctx.lineWidth = bar % 4 === 0 ? 2 : 1;
-      ctx.stroke();
-
-      // Bar number
-      if (bar < motherLoopBars && bar % Math.max(1, Math.floor(motherLoopBars / 20)) === 0) {
-        ctx.fillStyle = '#666';
-        ctx.font = '9px monospace';
-        ctx.textAlign = 'center';
-        ctx.fillText(`${bar + 1}`, x + (timelineWidth / motherLoopBars / 2), progressBarY + progressBarHeight + 12);
-      }
-    }
-
-    // Playhead on progress bar
-    const playheadX = progressBarX + progress * timelineWidth;
-    ctx.beginPath();
-    ctx.moveTo(playheadX, progressBarY - 5);
-    ctx.lineTo(playheadX - 5, progressBarY - 12);
-    ctx.lineTo(playheadX + 5, progressBarY - 12);
-    ctx.closePath();
+    // Current position
+    const currentBarDisplay = Math.floor(cycleBeats / BEATS_PER_BAR) + 1;
+    const currentBeatDisplay = Math.floor(cycleBeats % BEATS_PER_BAR) + 1;
     ctx.fillStyle = '#fff';
-    ctx.fill();
+    ctx.font = 'bold 14px monospace';
+    ctx.fillText(`Bar ${currentBarDisplay}.${currentBeatDisplay}`, 10, 40);
 
-    // Current position text
-    ctx.fillStyle = '#fff';
-    ctx.font = 'bold 12px monospace';
-    ctx.textAlign = 'right';
-    const currentBarInCycle = Math.floor(cyclePosition / beatsPerBar) + 1;
-    ctx.fillText(`${currentBarInCycle} / ${motherLoopBars}`, width - 10, 28);
-
-    // Tempo
+    // Tempo and playing status
     ctx.fillStyle = '#888';
     ctx.font = '11px monospace';
-    ctx.fillText(`${tempo} BPM`, width - 10, 44);
+    ctx.textAlign = 'right';
+    ctx.fillText(`${Math.round(bpm)} BPM`, width - 10, 20);
 
-    // Playing indicator
     if (isPlaying) {
       ctx.fillStyle = '#4ade80';
       ctx.beginPath();
-      ctx.arc(width - 80, 36, 4, 0, Math.PI * 2);
+      ctx.arc(width - 60, 35, 5, 0, Math.PI * 2);
       ctx.fill();
+      ctx.fillStyle = '#4ade80';
+      ctx.textAlign = 'left';
+      ctx.fillText('PLAYING', width - 50, 40);
     }
 
-    // === PIANO ROLL on left side ===
-    const trackHeight = loops.length > 0 ? timelineHeight / loops.length : timelineHeight;
+    // === PROGRESS BAR ===
+    const progressBarY = headerHeight - 8;
+    const progressBarHeight = 4;
+    ctx.fillStyle = '#333';
+    ctx.fillRect(trackLabelWidth, progressBarY, timelineWidth, progressBarHeight);
 
-    // Draw piano keys (simplified, just for the first track area)
-    ctx.fillStyle = '#1a1a2e';
-    ctx.fillRect(0, headerHeight, pianoWidth, timelineHeight);
-
-    // Piano key labels (show every octave)
-    for (let pitch = MIN_PITCH; pitch <= MAX_PITCH; pitch++) {
-      const y = headerHeight + timelineHeight - ((pitch - MIN_PITCH) / PITCH_RANGE) * timelineHeight;
-
-      if (pitch % 12 === 0) { // C notes
-        ctx.fillStyle = '#555';
-        ctx.font = '9px monospace';
-        ctx.textAlign = 'right';
-        ctx.fillText(pitchToNote(pitch), pianoWidth - 5, y + 3);
-      }
-
-      // Draw key indicator
-      const keyHeight = timelineHeight / PITCH_RANGE;
-      if (isBlackKey(pitch)) {
-        ctx.fillStyle = '#333';
-      } else {
-        ctx.fillStyle = '#444';
-      }
-      ctx.fillRect(0, y - keyHeight / 2, pianoWidth - 10, keyHeight - 1);
-    }
+    const progress = cycleBeats / motherLoopBeats;
+    ctx.fillStyle = '#4ade80';
+    ctx.fillRect(trackLabelWidth, progressBarY, timelineWidth * progress, progressBarHeight);
 
     // === TRACKS ===
+    if (loops.length === 0) {
+      ctx.fillStyle = '#666';
+      ctx.font = '14px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('No loops', width / 2, height / 2);
+      animationRef.current = requestAnimationFrame(draw);
+      return;
+    }
+
+    const trackHeight = timelineHeight / loops.length;
+
     loops.forEach((loop, trackIndex) => {
       const trackY = headerHeight + trackIndex * trackHeight;
       const isActive = !loop.muted;
-      const isEditable = editableLoopIds.includes(loop.id);
       const isHovered = hoveredTrack === loop.id;
+      const loopBeats = loop.bars * BEATS_PER_BAR;
 
       // Track background
-      ctx.fillStyle = isHovered ? '#1e1e3a' : '#151525';
-      ctx.fillRect(pianoWidth, trackY, trackLabelWidth + timelineWidth, trackHeight);
+      ctx.fillStyle = isHovered ? '#1a1a2e' : '#111118';
+      ctx.fillRect(0, trackY, width, trackHeight);
 
       // Track separator
-      ctx.strokeStyle = '#333';
+      ctx.strokeStyle = '#252542';
       ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.moveTo(pianoWidth, trackY + trackHeight);
+      ctx.moveTo(0, trackY + trackHeight);
       ctx.lineTo(width, trackY + trackHeight);
       ctx.stroke();
 
       // Track label area
-      ctx.fillStyle = isActive ? '#1a1a2e' : '#121220';
-      ctx.fillRect(pianoWidth, trackY, trackLabelWidth, trackHeight);
+      ctx.fillStyle = '#151520';
+      ctx.fillRect(0, trackY, trackLabelWidth, trackHeight);
 
       // Track name
       ctx.fillStyle = isActive ? loop.color : '#555';
-      ctx.font = 'bold 11px monospace';
+      ctx.font = 'bold 12px monospace';
       ctx.textAlign = 'left';
-      ctx.fillText(loop.name, pianoWidth + 8, trackY + 18);
+      ctx.fillText(loop.name, 8, trackY + 20);
 
       // Loop info
       ctx.fillStyle = '#666';
-      ctx.font = '9px monospace';
-      ctx.fillText(`${loop.bars} bars`, pianoWidth + 8, trackY + 32);
-      ctx.fillText(`${loop.pattern?.length || 0} notes`, pianoWidth + 8, trackY + 44);
+      ctx.font = '10px monospace';
+      ctx.fillText(`${loop.bars} bars`, 8, trackY + 35);
 
-      // Editable indicator
-      if (isEditable) {
-        ctx.fillStyle = loop.color;
-        ctx.fillRect(pianoWidth, trackY, 3, trackHeight);
-      }
+      // Current position within THIS loop
+      const loopPosition = cycleBeats % loopBeats;
+      const loopBar = Math.floor(loopPosition / BEATS_PER_BAR) + 1;
+      const loopBeat = Math.floor(loopPosition % BEATS_PER_BAR) + 1;
+      ctx.fillStyle = isActive ? loop.color : '#555';
+      ctx.fillText(`${loopBar}.${loopBeat}`, 8, trackY + 50);
 
-      // === TIMELINE GRID ===
-      const timelineX = pianoWidth + trackLabelWidth;
-
-      // Draw beat grid
+      // === GRID ===
+      // Draw beat grid lines
       for (let beat = 0; beat <= motherLoopBeats; beat++) {
-        const x = timelineX + (beat / motherLoopBeats) * timelineWidth;
+        const x = trackLabelWidth + (beat / motherLoopBeats) * timelineWidth;
         ctx.beginPath();
         ctx.moveTo(x, trackY);
         ctx.lineTo(x, trackY + trackHeight);
 
-        if (beat % beatsPerBar === 0) {
+        if (beat % BEATS_PER_BAR === 0) {
+          // Bar line
           ctx.strokeStyle = '#333';
           ctx.lineWidth = 1;
         } else {
-          ctx.strokeStyle = '#1a1a2a';
+          // Beat line
+          ctx.strokeStyle = '#1a1a1a';
           ctx.lineWidth = 0.5;
         }
         ctx.stroke();
       }
 
-      // Draw loop boundary markers
-      for (let rep = 0; rep <= Math.ceil(motherLoopBars / loop.bars); rep++) {
-        const loopStartBeat = rep * loop.bars * beatsPerBar;
-        if (loopStartBeat >= motherLoopBeats) break;
+      // Draw loop restart markers (where this loop cycles within mother loop)
+      for (let rep = 0; rep <= Math.ceil(motherLoopBeats / loopBeats); rep++) {
+        const loopStartBeat = rep * loopBeats;
+        if (loopStartBeat > motherLoopBeats) break;
 
-        const x = timelineX + (loopStartBeat / motherLoopBeats) * timelineWidth;
+        const x = trackLabelWidth + (loopStartBeat / motherLoopBeats) * timelineWidth;
         ctx.strokeStyle = isActive ? loop.color : '#444';
         ctx.lineWidth = 2;
         ctx.beginPath();
@@ -276,18 +234,17 @@ export function TimelineView({
         ctx.lineTo(x, trackY + trackHeight);
         ctx.stroke();
 
-        // Loop number
-        if (rep > 0) {
+        // Label loop repetition
+        if (rep > 0 && loopStartBeat < motherLoopBeats) {
           ctx.fillStyle = isActive ? `${loop.color}88` : '#44444488';
-          ctx.font = '8px monospace';
+          ctx.font = '9px monospace';
           ctx.textAlign = 'left';
-          ctx.fillText(`rep ${rep + 1}`, x + 3, trackY + 12);
+          ctx.fillText(`#${rep + 1}`, x + 3, trackY + 12);
         }
       }
 
       // === DRAW NOTES ===
       if (loop.pattern && loop.pattern.length > 0) {
-        const loopBeats = loop.bars * beatsPerBar;
         const repetitions = Math.ceil(motherLoopBeats / loopBeats);
 
         for (let rep = 0; rep < repetitions; rep++) {
@@ -295,85 +252,80 @@ export function TimelineView({
           const isSeedLoop = rep === 0;
 
           loop.pattern.forEach((note: NoteEvent) => {
-            const noteBeat = repStartBeat + note.time;
-            if (noteBeat >= motherLoopBeats) return;
+            // note.time is in beats from the start of the loop
+            const noteBeatInMother = repStartBeat + note.time;
+            if (noteBeatInMother >= motherLoopBeats) return;
 
             const pitch = noteToPitch(note.note);
             if (pitch < MIN_PITCH || pitch > MAX_PITCH) return;
 
-            // Note position
-            const noteX = timelineX + (noteBeat / motherLoopBeats) * timelineWidth;
-            const noteY = trackY + trackHeight - ((pitch - MIN_PITCH + 0.5) / PITCH_RANGE) * trackHeight;
+            // X position: note beat position within mother loop
+            const noteX = trackLabelWidth + (noteBeatInMother / motherLoopBeats) * timelineWidth;
 
-            // Note duration in pixels
+            // Y position: pitch mapped to track height
+            const pitchNormalized = (pitch - MIN_PITCH) / PITCH_RANGE;
+            const noteY = trackY + trackHeight * (1 - pitchNormalized) - 2;
+
+            // Note size
             const durationBeats = note.duration === '8n' ? 0.5 :
                                   note.duration === '4n' ? 1 :
-                                  note.duration === '2n' ? 2 :
-                                  note.duration === '1n' ? 4 : 0.5;
+                                  note.duration === '2n' ? 2 : 0.5;
             const noteWidth = Math.max(4, (durationBeats / motherLoopBeats) * timelineWidth);
-            const noteH = Math.max(2, trackHeight / PITCH_RANGE * 0.8);
+            const noteHeight = Math.max(4, trackHeight / PITCH_RANGE * 0.8);
 
-            // Color based on seed vs repeated
+            // Color: seed loop is full color, repeats are grey
             if (isSeedLoop) {
-              // Full color, full saturation for seed loop
               ctx.fillStyle = isActive ? loop.color : '#666';
               ctx.globalAlpha = isActive ? 1 : 0.5;
             } else {
-              // Greyed out for repeated loops
-              ctx.fillStyle = isActive ? '#666' : '#444';
-              ctx.globalAlpha = isActive ? 0.4 : 0.2;
+              ctx.fillStyle = isActive ? '#555' : '#333';
+              ctx.globalAlpha = isActive ? 0.5 : 0.3;
             }
 
-            // Draw note rectangle
-            ctx.fillRect(noteX, noteY - noteH / 2, noteWidth, noteH);
-
-            // Note border for seed notes
-            if (isSeedLoop && isActive) {
-              ctx.strokeStyle = '#fff';
-              ctx.lineWidth = 0.5;
-              ctx.strokeRect(noteX, noteY - noteH / 2, noteWidth, noteH);
-            }
-
+            // Draw note
+            ctx.fillRect(noteX - 2, noteY - noteHeight / 2, noteWidth, noteHeight);
             ctx.globalAlpha = 1;
           });
         }
       }
 
-      // === PLAYHEAD for this track ===
-      const trackPlayheadX = timelineX + (cyclePosition / motherLoopBeats) * timelineWidth;
+      // === PLAYHEAD ===
+      const playheadX = trackLabelWidth + (cycleBeats / motherLoopBeats) * timelineWidth;
+
+      // Playhead line
       ctx.strokeStyle = '#fff';
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.moveTo(trackPlayheadX, trackY);
-      ctx.lineTo(trackPlayheadX, trackY + trackHeight);
+      ctx.moveTo(playheadX, trackY);
+      ctx.lineTo(playheadX, trackY + trackHeight);
       ctx.stroke();
 
       // Playhead glow
-      const gradient = ctx.createLinearGradient(trackPlayheadX - 10, 0, trackPlayheadX + 10, 0);
+      const gradient = ctx.createLinearGradient(playheadX - 15, 0, playheadX + 15, 0);
       gradient.addColorStop(0, 'transparent');
-      gradient.addColorStop(0.5, 'rgba(255,255,255,0.2)');
+      gradient.addColorStop(0.5, 'rgba(255,255,255,0.1)');
       gradient.addColorStop(1, 'transparent');
       ctx.fillStyle = gradient;
-      ctx.fillRect(trackPlayheadX - 10, trackY, 20, trackHeight);
+      ctx.fillRect(playheadX - 15, trackY, 30, trackHeight);
     });
 
     // === LEGEND ===
-    ctx.fillStyle = '#555';
+    ctx.fillStyle = '#444';
     ctx.font = '9px monospace';
     ctx.textAlign = 'left';
-    ctx.fillText('Seed pattern = full color | Repeated = grey', pianoWidth + trackLabelWidth + 10, height - 5);
+    ctx.fillText('Full color = seed pattern | Grey = repeated | Colored lines = loop restart', trackLabelWidth + 5, height - 4);
 
     animationRef.current = requestAnimationFrame(draw);
-  }, [loops, currentBar, currentBeat, isPlaying, tempo, motherLoopBars, motherLoopBeats, cyclePosition, editableLoopIds, hoveredTrack, beatsPerBar]);
+  }, [loops, isPlaying, tempo, motherLoopBars, motherLoopBeats, editableLoopIds, hoveredTrack, BEATS_PER_BAR]);
 
-  // Handle mouse move for track hover
+  // Mouse move for track hover
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas || loops.length === 0) return;
 
     const rect = canvas.getBoundingClientRect();
     const y = e.clientY - rect.top;
-    const headerHeight = 60;
+    const headerHeight = 50;
     const trackHeight = (canvas.height - headerHeight) / loops.length;
 
     if (y < headerHeight) {
@@ -393,7 +345,7 @@ export function TimelineView({
     setHoveredTrack(null);
   }, []);
 
-  // Handle click for editing
+  // Click to add/remove notes
   const handleClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas || !onPatternChange) return;
@@ -402,48 +354,48 @@ export function TimelineView({
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
-    const pianoWidth = 50;
-    const headerHeight = 60;
-    const trackLabelWidth = 80;
-    const timelineWidth = canvas.width - pianoWidth - trackLabelWidth;
+    const headerHeight = 50;
+    const trackLabelWidth = 100;
+    const timelineWidth = canvas.width - trackLabelWidth;
     const trackHeight = loops.length > 0 ? (canvas.height - headerHeight) / loops.length : 0;
 
-    // Check if click is in timeline area
-    if (x < pianoWidth + trackLabelWidth || y < headerHeight) return;
+    // Must be in timeline area
+    if (x < trackLabelWidth || y < headerHeight) return;
 
-    // Find which track was clicked
+    // Find track
     const trackIndex = Math.floor((y - headerHeight) / trackHeight);
     if (trackIndex < 0 || trackIndex >= loops.length) return;
 
     const loop = loops[trackIndex];
     if (!editableLoopIds.includes(loop.id)) return;
 
-    // Calculate beat position (only in first loop cycle)
-    const timelineX = x - pianoWidth - trackLabelWidth;
-    const beatPosition = (timelineX / timelineWidth) * motherLoopBeats;
-    const loopBeats = loop.bars * beatsPerBar;
-    const beatInLoop = beatPosition % loopBeats;
+    const loopBeats = loop.bars * 4;
+
+    // Calculate beat position
+    const timelineX = x - trackLabelWidth;
+    const motherBeat = (timelineX / timelineWidth) * motherLoopBeats;
+    const beatInLoop = motherBeat % loopBeats;
     const quantizedBeat = Math.round(beatInLoop * 2) / 2; // Quantize to 8th notes
 
-    // Calculate pitch from Y position
+    // Calculate pitch
     const trackY = headerHeight + trackIndex * trackHeight;
     const relativeY = y - trackY;
     const pitchNormalized = 1 - (relativeY / trackHeight);
     const pitch = Math.round(MIN_PITCH + pitchNormalized * PITCH_RANGE);
-    const note = pitchToNote(Math.max(MIN_PITCH, Math.min(MAX_PITCH, pitch)));
+    const clampedPitch = Math.max(MIN_PITCH, Math.min(MAX_PITCH, pitch));
+    const note = pitchToNote(clampedPitch);
 
-    // Check if there's an existing note at this position
+    // Toggle note
+    const tolerance = 0.25;
     const existingIndex = loop.pattern.findIndex(n =>
-      Math.abs(n.time - quantizedBeat) < 0.25 &&
-      noteToPitch(n.note) === pitch
+      Math.abs(n.time - quantizedBeat) < tolerance &&
+      Math.abs(noteToPitch(n.note) - clampedPitch) < 3
     );
 
     let newPattern: NoteEvent[];
     if (existingIndex >= 0) {
-      // Remove note
       newPattern = loop.pattern.filter((_, i) => i !== existingIndex);
     } else {
-      // Add note
       newPattern = [...loop.pattern, {
         note,
         time: quantizedBeat,
@@ -453,7 +405,7 @@ export function TimelineView({
     }
 
     onPatternChange(loop.id, newPattern);
-  }, [loops, editableLoopIds, onPatternChange, motherLoopBeats, beatsPerBar]);
+  }, [loops, editableLoopIds, onPatternChange, motherLoopBeats]);
 
   useEffect(() => {
     const canvas = canvasRef.current;

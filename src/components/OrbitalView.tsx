@@ -1,4 +1,5 @@
 import { useRef, useEffect, useCallback, useState } from 'react';
+import * as Tone from 'tone';
 import type { Loop, NoteEvent } from '../types';
 
 interface OrbitalViewProps {
@@ -88,6 +89,20 @@ export function OrbitalView({
     rings: { loopId: string; radius: number; bars: number }[];
     cycleLength: number;
   }>({ centerX: 0, centerY: 0, rings: [], cycleLength: 1 });
+
+  // Get real-time position from Tone.js transport (including fractional bars)
+  const getRealTimePositionInBars = useCallback(() => {
+    // Use Tone.js transport seconds and convert to bars for accuracy
+    const transportSeconds = Tone.getTransport().seconds;
+    const bpm = Tone.getTransport().bpm.value;
+    const beatsPerSecond = bpm / 60;
+    // Subtract audio context latency to sync visual with what's heard
+    const audioLatency = Tone.getContext().lookAhead || 0;
+    const adjustedSeconds = Math.max(0, transportSeconds - audioLatency);
+    const totalBeats = adjustedSeconds * beatsPerSecond;
+    const beatsPerBar = 4;
+    return totalBeats / beatsPerBar;
+  }, []);
 
   // Apply queued changes when loop restarts
   useEffect(() => {
@@ -233,8 +248,12 @@ export function OrbitalView({
         : loops.map(l => l.bars);
       const cycleLength = loopBars.length > 0 ? lcmArray(loopBars) : 40;
 
-      // Current position in the cycle
-      const cyclePosition = currentBar % cycleLength;
+      // Get real-time position from Tone.js for smooth animation
+      const realTimePositionBars = getRealTimePositionInBars();
+      // Current position in the cycle (including fractional for smooth playhead)
+      const cyclePositionSmooth = realTimePositionBars % cycleLength;
+      // Integer position for display
+      const cyclePosition = Math.floor(cyclePositionSmooth);
 
       // Store layout for click detection
       const rings: { loopId: string; radius: number; bars: number }[] = [];
@@ -397,9 +416,9 @@ export function OrbitalView({
           });
         }
 
-        // Draw progress arc
+        // Draw progress arc (use smooth position for continuous animation)
         const startAngle = -Math.PI / 2;
-        const progressAngle = startAngle + (cyclePosition / cycleLength) * Math.PI * 2;
+        const progressAngle = startAngle + (cyclePositionSmooth / cycleLength) * Math.PI * 2;
 
         ctx.beginPath();
         ctx.arc(centerX, centerY, radius, startAngle, progressAngle);
@@ -458,7 +477,7 @@ export function OrbitalView({
 
       // Draw "bars until realign" countdown
       if (activeLoops.length > 1) {
-        const barsUntilRealign = cycleLength - cyclePosition;
+        const barsUntilRealign = Math.ceil(cycleLength - cyclePositionSmooth);
         ctx.fillStyle = '#4ade80';
         ctx.font = 'bold 14px monospace';
         ctx.textAlign = 'center';
@@ -485,7 +504,7 @@ export function OrbitalView({
 
       animationRef.current = requestAnimationFrame(draw);
     },
-    [loops, currentBar, isPlaying, tempo, realignmentBar, selectedLoop, editableLoopIds, queuedChanges, pendingPattern]
+    [loops, isPlaying, tempo, realignmentBar, selectedLoop, editableLoopIds, queuedChanges, pendingPattern, getRealTimePositionInBars]
   );
 
   useEffect(() => {
