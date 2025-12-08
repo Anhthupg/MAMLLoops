@@ -875,6 +875,45 @@ export class SyncManager {
     );
   }
 
+  // Apply a snapshot to restore loop states
+  private applySnapshot(snapshot: LoopSnapshot[]): void {
+    console.log('Applying section snapshot:', snapshot.length, 'loops');
+
+    // First, mute all loops
+    this.state = {
+      ...this.state,
+      players: this.state.players.map(p => ({
+        ...p,
+        loops: p.loops.map(l => ({ ...l, muted: true })),
+      })),
+    };
+
+    // Then unmute and update patterns for loops in the snapshot
+    snapshot.forEach(snap => {
+      this.state = {
+        ...this.state,
+        players: this.state.players.map(p => {
+          if (p.id === snap.playerId) {
+            return {
+              ...p,
+              loops: p.loops.map(l => {
+                if (l.id === snap.loopId) {
+                  return {
+                    ...l,
+                    pattern: [...snap.pattern],
+                    muted: snap.muted,
+                  };
+                }
+                return l;
+              }),
+            };
+          }
+          return p;
+        }),
+      };
+    });
+  }
+
   // Generate next section name (e.g., "D", "E", or "A2" if A exists)
   private generateNextSectionName(): string {
     const existing = new Set(this.state.sections.map(s => s.name));
@@ -898,7 +937,10 @@ export class SyncManager {
   // Immediately change section (leader only)
   changeSection(sectionIndex: number): void {
     if (this.isLeader()) {
-      this.sync.send({ type: 'section_change', sectionIndex });
+      const section = this.state.sections[sectionIndex];
+      // Include snapshot if section has memory
+      const snapshot = section?.hasMemory ? section.snapshot : undefined;
+      this.sync.send({ type: 'section_change', sectionIndex, snapshot });
     }
   }
 
@@ -1036,6 +1078,10 @@ export class SyncManager {
         this.state = { ...this.state, nextSectionIndex: message.sectionIndex, sectionVotes: [] };
         break;
       case 'section_change':
+        // Apply snapshot if provided (restore loop states from memory section)
+        if (message.snapshot && message.snapshot.length > 0) {
+          this.applySnapshot(message.snapshot);
+        }
         this.state = {
           ...this.state,
           currentSectionIndex: message.sectionIndex,

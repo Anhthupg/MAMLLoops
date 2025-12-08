@@ -162,6 +162,25 @@
   font-weight: 700;
 }
 
+.memory-indicator {
+  font-size: 8px;
+  color: #a855f7;
+  font-weight: 700;
+  background: rgba(168, 85, 247, 0.2);
+  padding: 1px 3px;
+  border-radius: 3px;
+  margin-left: 2px;
+}
+
+.section-button.has-memory {
+  border-color: rgba(168, 85, 247, 0.5);
+}
+
+.section-button.has-memory.current {
+  border-color: #a855f7;
+  box-shadow: 0 0 6px rgba(168, 85, 247, 0.3);
+}
+
 .vote-notice {
   font-size: 9px;
   color: #555;

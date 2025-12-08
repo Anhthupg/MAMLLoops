@@ -84,11 +84,12 @@ export function SectionBar({
           return (
             <button
               key={section.id}
-              className={`section-button ${isCurrent ? 'current' : ''} ${isQueued ? 'queued' : ''} ${iVoted ? 'voted' : ''}`}
+              className={`section-button ${isCurrent ? 'current' : ''} ${isQueued ? 'queued' : ''} ${iVoted ? 'voted' : ''} ${section.hasMemory ? 'has-memory' : ''}`}
               onClick={() => onVoteSection(index)}
-              title={`Vote for ${section.name}${votes > 0 ? ` (${votes} vote${votes > 1 ? 's' : ''})` : ''}`}
+              title={`Vote for ${section.name}${section.hasMemory ? ' (has saved loop states)' : ''}${votes > 0 ? ` (${votes} vote${votes > 1 ? 's' : ''})` : ''}`}
             >
               <span className="button-name">{section.name}</span>
+              {section.hasMemory && <span className="memory-indicator">M</span>}
               {votes > 0 && !isQueued && (
                 <span className="vote-count">{votes}/{Math.ceil(playerCount / 2 + 0.1)}</span>
               )}

@@ -109,6 +109,30 @@ function App() {
     });
   }, [room.roomState, room.currentPlayer, audio]);
 
+  // Track section changes and sync audio engine with snapshot (muted states + patterns)
+  const prevSectionRef = useRef<number>(-1);
+  useEffect(() => {
+    if (!room.roomState) return;
+
+    const currentSection = room.roomState.currentSectionIndex;
+    if (prevSectionRef.current !== currentSection) {
+      prevSectionRef.current = currentSection;
+
+      // When section changes, sync all loop muted states to audio engine
+      console.log('[App] Section changed to:', currentSection);
+
+      room.roomState.players.forEach(player => {
+        player.loops.forEach(loop => {
+          // Toggle loop based on muted state from room state
+          audio.toggleLoop(loop, !loop.muted);
+
+          // Also update pattern in case snapshot restored it
+          audio.updateLoopPattern(loop.id, loop.pattern);
+        });
+      });
+    }
+  }, [room.roomState, audio]);
+
   // Apply queued pattern changes when loop cycles
   useEffect(() => {
     if (queuedChanges.length === 0) return;
@@ -297,7 +321,7 @@ function App() {
         <p>
           Inspired by Philip Glass • Polymetric patterns meet collaborative music-making
         </p>
-        <p className="copyright">© Phan Gia Anh Thư</p>
+        <p className="copyright">© 2025 Phan Gia Anh Thư. All Rights Reserved.</p>
       </footer>
     </div>
   );

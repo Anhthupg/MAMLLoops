@@ -134,7 +134,7 @@ export type SyncMessage =
   | { type: 'loop_update'; playerId: string; loopId: string; pattern: NoteEvent[] }
   | { type: 'loop_volume'; playerId: string; loopId: string; volume: number }
   | { type: 'loop_transpose'; playerId: string; loopId: string; transpose: number }
-  | { type: 'section_change'; sectionIndex: number }
+  | { type: 'section_change'; sectionIndex: number; snapshot?: LoopSnapshot[] }
   | { type: 'section_queue'; sectionIndex: number }
   | { type: 'section_vote'; playerId: string; sectionIndex: number }
   | { type: 'create_section_vote'; playerId: string; hasMemory: boolean; loopStateHash: string }
