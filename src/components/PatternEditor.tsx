@@ -1,10 +1,20 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import type { Loop, NoteEvent } from '../types';
 import './PatternEditor.css';
 
 // Available notes for the pattern editor
 const NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 const OCTAVES = [2, 3, 4, 5, 6];
+
+// Velocity presets for quick selection
+const VELOCITY_PRESETS = [
+  { label: 'pp', value: 0.2 },
+  { label: 'p', value: 0.4 },
+  { label: 'mp', value: 0.6 },
+  { label: 'mf', value: 0.8 },
+  { label: 'f', value: 0.9 },
+  { label: 'ff', value: 1.0 },
+];
 
 interface PatternEditorProps {
   loop: Loop;
@@ -14,6 +24,7 @@ interface PatternEditorProps {
 
 export function PatternEditor({ loop, onPatternChange, onClose }: PatternEditorProps) {
   const [pattern, setPattern] = useState<NoteEvent[]>([...loop.pattern]);
+  const [selectedNoteIndex, setSelectedNoteIndex] = useState<number | null>(null);
   const beatsPerBar = 4;
   const totalBeats = loop.bars * beatsPerBar;
 
@@ -61,6 +72,46 @@ export function PatternEditor({ loop, onPatternChange, onClose }: PatternEditorP
 
   const handleClear = () => {
     setPattern([]);
+    setSelectedNoteIndex(null);
+  };
+
+  // Update velocity of a specific note
+  const updateNoteVelocity = useCallback((noteIndex: number, velocity: number) => {
+    setPattern(prev => {
+      const newPattern = [...prev];
+      newPattern[noteIndex] = { ...newPattern[noteIndex], velocity };
+      return newPattern;
+    });
+  }, []);
+
+  // Randomize all velocities within a range
+  const randomizeVelocities = useCallback((minVel: number = 0.3, maxVel: number = 1.0) => {
+    setPattern(prev => prev.map(note => ({
+      ...note,
+      velocity: minVel + Math.random() * (maxVel - minVel)
+    })));
+  }, []);
+
+  // Humanize velocities - add slight random variation to existing values
+  const humanizeVelocities = useCallback(() => {
+    setPattern(prev => prev.map(note => {
+      const currentVel = note.velocity || 0.8;
+      const variation = (Math.random() - 0.5) * 0.2; // +/- 10%
+      return {
+        ...note,
+        velocity: Math.max(0.1, Math.min(1.0, currentVel + variation))
+      };
+    }));
+  }, []);
+
+  // Reset all velocities to default
+  const resetVelocities = useCallback(() => {
+    setPattern(prev => prev.map(note => ({ ...note, velocity: 0.8 })));
+  }, []);
+
+  // Get note index at a specific time position
+  const getNoteIndexAtTime = (time: number): number => {
+    return pattern.findIndex(n => Math.abs(n.time - time) < 0.01);
   };
 
   // Generate time slots (every 8th note = 0.5 beats)
@@ -113,13 +164,45 @@ export function PatternEditor({ loop, onPatternChange, onClose }: PatternEditorP
                         const isActive = isCellActive(time, note, octave);
                         const isBarStart = time % beatsPerBar === 0;
                         const isBeatStart = time % 1 === 0;
+                        const noteIndex = getNoteIndexAtTime(time);
+                        const noteEvent = isActive ? pattern[noteIndex] : null;
+                        const velocity = noteEvent?.velocity || 0.8;
+                        const isSelected = noteIndex === selectedNoteIndex;
                         return (
                           <div
                             key={time}
-                            className={`grid-cell ${isActive ? 'active' : ''} ${isBarStart ? 'bar-start' : ''} ${isBeatStart ? 'beat-start' : ''}`}
-                            style={{ backgroundColor: isActive ? loop.color : undefined }}
-                            onClick={() => handleCellClick(time, note, octave)}
-                          />
+                            className={`grid-cell ${isActive ? 'active' : ''} ${isBarStart ? 'bar-start' : ''} ${isBeatStart ? 'beat-start' : ''} ${isSelected ? 'selected' : ''}`}
+                            style={{
+                              backgroundColor: isActive ? loop.color : undefined,
+                              opacity: isActive ? 0.4 + (velocity * 0.6) : undefined,
+                            }}
+                            onClick={() => {
+                              if (isActive) {
+                                // If clicking an active note, select it for velocity editing
+                                setSelectedNoteIndex(noteIndex === selectedNoteIndex ? null : noteIndex);
+                              } else {
+                                handleCellClick(time, note, octave);
+                              }
+                            }}
+                            onDoubleClick={() => {
+                              // Double-click removes the note
+                              if (isActive) {
+                                handleCellClick(time, note, octave);
+                                setSelectedNoteIndex(null);
+                              }
+                            }}
+                            title={isActive ? `${noteEvent?.note} - Velocity: ${Math.round(velocity * 100)}%` : 'Click to add note'}
+                          >
+                            {isActive && (
+                              <div
+                                className="velocity-bar"
+                                style={{
+                                  height: `${velocity * 100}%`,
+                                  backgroundColor: loop.color,
+                                }}
+                              />
+                            )}
+                          </div>
                         );
                       })}
                     </div>
@@ -130,12 +213,76 @@ export function PatternEditor({ loop, onPatternChange, onClose }: PatternEditorP
           </div>
         </div>
 
+        {/* Velocity Controls Panel */}
+        <div className="velocity-controls">
+          <div className="velocity-header">
+            <h3>Velocity / Intensity</h3>
+            <div className="velocity-actions">
+              <button className="btn-small" onClick={() => randomizeVelocities()} title="Random velocities">
+                Random
+              </button>
+              <button className="btn-small" onClick={humanizeVelocities} title="Add slight variation">
+                Humanize
+              </button>
+              <button className="btn-small" onClick={resetVelocities} title="Reset to default">
+                Reset
+              </button>
+            </div>
+          </div>
+
+          {selectedNoteIndex !== null && pattern[selectedNoteIndex] && (
+            <div className="selected-note-velocity">
+              <span className="selected-note-label">
+                {pattern[selectedNoteIndex].note} @ beat {pattern[selectedNoteIndex].time}
+              </span>
+              <div className="velocity-slider-container">
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={Math.round((pattern[selectedNoteIndex].velocity || 0.8) * 100)}
+                  onChange={(e) => updateNoteVelocity(selectedNoteIndex, Number(e.target.value) / 100)}
+                  className="velocity-slider"
+                />
+                <span className="velocity-value">{Math.round((pattern[selectedNoteIndex].velocity || 0.8) * 100)}%</span>
+              </div>
+              <div className="velocity-presets">
+                {VELOCITY_PRESETS.map(preset => (
+                  <button
+                    key={preset.label}
+                    className={`preset-btn ${Math.abs((pattern[selectedNoteIndex]?.velocity || 0.8) - preset.value) < 0.05 ? 'active' : ''}`}
+                    onClick={() => updateNoteVelocity(selectedNoteIndex, preset.value)}
+                    title={`${preset.label} (${Math.round(preset.value * 100)}%)`}
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {selectedNoteIndex === null && pattern.length > 0 && (
+            <div className="velocity-hint">
+              Click a note to adjust its velocity
+            </div>
+          )}
+        </div>
+
         {/* Pattern preview */}
         <div className="pattern-preview">
           <h3>Pattern ({pattern.length} notes)</h3>
           <div className="note-sequence">
             {pattern.map((note, i) => (
-              <span key={i} className="note-chip" style={{ backgroundColor: loop.color }}>
+              <span
+                key={i}
+                className={`note-chip ${i === selectedNoteIndex ? 'selected' : ''}`}
+                style={{
+                  backgroundColor: loop.color,
+                  opacity: 0.4 + ((note.velocity || 0.8) * 0.6)
+                }}
+                onClick={() => setSelectedNoteIndex(i === selectedNoteIndex ? null : i)}
+                title={`Velocity: ${Math.round((note.velocity || 0.8) * 100)}%`}
+              >
                 {note.note} @ {note.time}
               </span>
             ))}

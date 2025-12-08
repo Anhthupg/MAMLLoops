@@ -1,0 +1,182 @@
+/* Full IntensityView component */
+.intensity-view {
+  position: relative;
+  width: 100%;
+  height: 80px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
+  overflow: hidden;
+  user-select: none;
+}
+
+.intensity-view.mode-edit {
+  cursor: crosshair;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.intensity-view.mode-show {
+  pointer-events: none;
+}
+
+/* Playhead */
+.intensity-playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: rgba(255, 255, 255, 0.8);
+  z-index: 10;
+  pointer-events: none;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
+}
+
+/* Container for all bars */
+.intensity-bars {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: flex-end;
+}
+
+/* Individual bar group */
+.intensity-bar-group {
+  position: absolute;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  height: 100%;
+  transition: transform 0.1s;
+}
+
+.intensity-bar-group.dragging {
+  transform: scaleX(1.5);
+  z-index: 5;
+}
+
+.mode-edit .intensity-bar-group {
+  cursor: ns-resize;
+}
+
+.mode-edit .intensity-bar-group:hover {
+  transform: scaleX(1.2);
+}
+
+/* Intensity bar (background - opaque) */
+.intensity-bar-bg {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  border-radius: 2px 2px 0 0;
+  transition: height 0.1s;
+}
+
+/* MIDI bar (foreground) */
+.intensity-bar-fg {
+  position: absolute;
+  bottom: 0;
+  left: 25%;
+  right: 25%;
+  border-radius: 2px 2px 0 0;
+  transition: height 0.1s;
+  box-shadow: 0 0 4px currentColor;
+}
+
+/* Velocity indicator tooltip */
+.velocity-indicator {
+  position: absolute;
+  top: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.9);
+  color: #fff;
+  font-size: 9px;
+  padding: 2px 4px;
+  border-radius: 3px;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.15s;
+  pointer-events: none;
+}
+
+.intensity-bar-group:hover .velocity-indicator,
+.intensity-bar-group.dragging .velocity-indicator {
+  opacity: 1;
+}
+
+/* Preset buttons */
+.intensity-presets {
+  position: absolute;
+  bottom: 4px;
+  left: 4px;
+  display: flex;
+  gap: 2px;
+  z-index: 20;
+}
+
+.intensity-presets .preset-btn {
+  width: 18px;
+  height: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.6);
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.intensity-presets .preset-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.5);
+  color: #fff;
+}
+
+.intensity-presets .preset-btn.random {
+  background: rgba(139, 92, 246, 0.4);
+  border-color: #8b5cf6;
+}
+
+.intensity-presets .preset-btn.random:hover {
+  background: rgba(139, 92, 246, 0.6);
+}
+
+/* Mini version for loop pads */
+.mini-intensity-view {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.mini-bar {
+  position: absolute;
+  bottom: 0;
+  min-width: 2px;
+  border-radius: 1px 1px 0 0;
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+  .intensity-view {
+    height: 60px;
+  }
+
+  .intensity-presets .preset-btn {
+    width: 16px;
+    height: 16px;
+    font-size: 9px;
+  }
+}

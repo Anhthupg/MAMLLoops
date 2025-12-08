@@ -1177,6 +1177,9 @@ export class SyncManager {
         playerId: p.id,
         pattern: [...l.pattern],
         muted: l.muted,
+        volume: l.volume,
+        transpose: l.transpose,
+        variation: l.variation,
       }))
     );
   }
@@ -1208,6 +1211,10 @@ export class SyncManager {
                     ...l,
                     pattern: [...snap.pattern],
                     muted: snap.muted,
+                    // Restore additional properties if present in snapshot
+                    volume: snap.volume !== undefined ? snap.volume : l.volume,
+                    transpose: snap.transpose !== undefined ? snap.transpose : l.transpose,
+                    variation: snap.variation !== undefined ? snap.variation : l.variation,
                   };
                 }
                 return l;
@@ -1481,14 +1488,20 @@ export class SyncManager {
       });
 
       // Find section with majority
-      for (const [section, count] of voteCounts) {
+      for (const [sectionIdx, count] of voteCounts) {
         if (count > playerCount / 2) {
-          // Majority reached - queue the section change
-          this.state = {
-            ...this.state,
-            nextSectionIndex: section,
-            sectionVotes: [] // Clear votes after majority reached
-          };
+          // Majority reached - broadcast section change to all peers
+          const section = this.state.sections[sectionIdx];
+          const snapshot = section?.hasMemory ? section.snapshot : undefined;
+
+          console.log('Section changed via majority vote to:', section?.name, snapshot ? 'with memory' : 'without memory');
+
+          // Broadcast the section change so all peers apply the snapshot
+          this.sync.send({
+            type: 'section_change',
+            sectionIndex: sectionIdx,
+            snapshot: snapshot,
+          });
           break;
         }
       }

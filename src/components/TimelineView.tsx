@@ -1,8 +1,218 @@
 import { useRef, useEffect, useCallback, useState } from 'react';
 import * as Tone from 'tone';
-import type { Loop, NoteEvent, InstrumentType } from '../types';
-import { VARIATION_LABELS, INSTRUMENT_INFO } from '../types';
-import { patternGenerators } from '../sync/SyncManager';
+import type { Loop, NoteEvent } from '../types';
+import { INSTRUMENT_INFO } from '../types';
+import { MiniIntensityPreview } from './MiniIntensityPreview';
+import { MiniPitchPreview } from './MiniPitchPreview';
+import { MiniRhythmPreview } from './MiniRhythmPreview';
+import { CombinedPatternPreview } from './CombinedPatternPreview';
+
+// ==========================================
+// PATTERN GENERATION UTILITIES
+// ==========================================
+
+// Generate intensity presets (velocity patterns) - noteCount × 4
+interface IntensityPreset {
+  id: number;
+  velocities: number[];
+}
+
+function generateIntensityPresets(noteCount: number): IntensityPreset[] {
+  if (noteCount === 0) return [];
+  const presetCount = noteCount * 4;
+  const presets: IntensityPreset[] = [];
+
+  for (let i = 0; i < presetCount; i++) {
+    const progress = i / (presetCount - 1);
+    const patternType = i % 8;
+    const velocities: number[] = [];
+
+    for (let j = 0; j < noteCount; j++) {
+      const noteProgress = j / Math.max(1, noteCount - 1);
+      let velocity: number;
+
+      switch (patternType) {
+        case 0: velocity = 0.2 + progress * 0.75; break;
+        case 1: velocity = 0.2 + noteProgress * (0.3 + progress * 0.5); break;
+        case 2: velocity = 0.95 - noteProgress * (0.3 + progress * 0.5); break;
+        case 3: velocity = 0.5 + Math.sin(noteProgress * Math.PI * (2 + i * 0.5)) * (0.2 + progress * 0.25); break;
+        case 4: { const acc = Math.max(2, Math.floor(4 - progress * 3)); velocity = j % acc === 0 ? 0.9 : 0.3 + progress * 0.3; break; }
+        case 5: velocity = (j % 2 === 0) ? 0.3 + noteProgress * 0.6 * (0.5 + progress * 0.5) : 0.9 - noteProgress * 0.6 * (0.5 + progress * 0.5); break;
+        case 6: { const pw = 0.2 + progress * 0.3; velocity = (noteProgress % 0.5 < pw) ? 0.8 + progress * 0.2 : 0.3 + progress * 0.2; break; }
+        case 7: { const seed = (i * 1000 + j * 7) % 100 / 100; velocity = 0.3 + seed * 0.6 + progress * 0.1; break; }
+        default: velocity = 0.7;
+      }
+      velocities.push(Math.max(0.1, Math.min(1.0, velocity)));
+    }
+    presets.push({ id: i, velocities });
+  }
+
+  // Add random preset at the end
+  presets.push({
+    id: presetCount,
+    velocities: Array.from({ length: noteCount }, () => 0.2 + Math.random() * 0.8)
+  });
+
+  return presets;
+}
+
+// 10 rhythm presets (timing patterns)
+interface RhythmPreset {
+  id: number;
+  label: string;
+  getBeats: (bars: number) => number[];
+}
+
+const RHYTHM_PRESETS: RhythmPreset[] = [
+  // Basic subdivisions
+  { id: 0, label: '1/4', getBeats: (bars) => {
+    const b: number[] = []; for (let i = 0; i < bars * 4; i++) b.push(i); return b;
+  }},
+  { id: 1, label: 'Swng', getBeats: (bars) => {
+    // Swing 8ths - offbeats delayed to 2/3 of beat (triplet feel)
+    const b: number[] = [];
+    for (let i = 0; i < bars * 4; i++) {
+      b.push(i);         // Downbeat at exact beat
+      b.push(i + 0.67);  // Offbeat swung to 2/3 of beat
+    }
+    return b;
+  }},
+  { id: 2, label: '1/8', getBeats: (bars) => {
+    // Straight 8ths
+    const b: number[] = []; for (let i = 0; i < bars * 8; i++) b.push(i * 0.5); return b;
+  }},
+  { id: 9, label: '1/16', getBeats: (bars) => {
+    const b: number[] = []; for (let i = 0; i < bars * 16; i++) b.push(i * 0.25); return b;
+  }},
+  // Syncopated - emphasize off-beats
+  { id: 3, label: 'Funk', getBeats: (bars) => {
+    const b: number[] = [];
+    for (let i = 0; i < bars; i++) {
+      b.push(i*4, i*4+0.5, i*4+1.5, i*4+2, i*4+2.75, i*4+3.5);
+    }
+    return b;
+  }},
+  // Dotted - 3+3+2 pattern (tresillo)
+  { id: 4, label: 'Tres', getBeats: (bars) => {
+    const b: number[] = [];
+    for (let i = 0; i < bars; i++) {
+      b.push(i*4, i*4+0.75, i*4+1.5, i*4+2, i*4+2.75, i*4+3.5);
+    }
+    return b;
+  }},
+  // Triplet feel
+  { id: 5, label: 'Trip', getBeats: (bars) => {
+    const b: number[] = [];
+    for (let i = 0; i < bars * 4; i++) {
+      b.push(i, i + 0.33, i + 0.67);
+    }
+    return b;
+  }},
+  // Clave pattern (Son clave 3-2)
+  { id: 6, label: 'Clav', getBeats: (bars) => {
+    const b: number[] = [];
+    for (let i = 0; i < bars; i += 2) {
+      b.push(i*4, i*4+1.5, i*4+3);
+      if (i + 1 < bars) {
+        b.push((i+1)*4+1, (i+1)*4+2.5);
+      }
+    }
+    return b;
+  }},
+  // Polyrhythm 3 over 4
+  { id: 7, label: '3:4', getBeats: (bars) => {
+    const b: number[] = [];
+    for (let i = 0; i < bars; i++) {
+      b.push(i*4, i*4+1.33, i*4+2.67);
+    }
+    return b;
+  }},
+  // Polyrhythm 5 over 4
+  { id: 8, label: '5:4', getBeats: (bars) => {
+    const b: number[] = [];
+    for (let i = 0; i < bars; i++) {
+      b.push(i*4, i*4+0.8, i*4+1.6, i*4+2.4, i*4+3.2);
+    }
+    return b;
+  }},
+  // Breakbeat pattern
+  { id: 9, label: 'Brk', getBeats: (bars) => {
+    const b: number[] = [];
+    for (let i = 0; i < bars; i++) {
+      b.push(i*4, i*4+0.25, i*4+1, i*4+1.5, i*4+2.5, i*4+3, i*4+3.25, i*4+3.75);
+    }
+    return b;
+  }},
+  // Sparse/ambient - less is more
+  { id: 10, label: 'Air', getBeats: (bars) => {
+    const b: number[] = [];
+    for (let i = 0; i < bars; i++) {
+      if (i % 2 === 0) b.push(i*4, i*4+2.5);
+      else b.push(i*4+1, i*4+3);
+    }
+    return b;
+  }},
+  // Amen break style
+  { id: 11, label: 'Amen', getBeats: (bars) => {
+    const b: number[] = [];
+    for (let i = 0; i < bars; i++) {
+      b.push(i*4, i*4+0.5, i*4+1, i*4+1.5, i*4+2.25, i*4+2.75, i*4+3, i*4+3.5);
+    }
+    return b;
+  }},
+  // Swing feel
+  { id: 12, label: 'Swng', getBeats: (bars) => {
+    const b: number[] = [];
+    for (let i = 0; i < bars * 4; i++) {
+      b.push(i, i + 0.67); // Swing 8ths
+    }
+    return b;
+  }},
+  // Half-time
+  { id: 13, label: 'Half', getBeats: (bars) => {
+    const b: number[] = [];
+    for (let i = 0; i < bars; i++) {
+      b.push(i*4, i*4+2);
+    }
+    return b;
+  }},
+  // Shuffle
+  { id: 14, label: 'Shuf', getBeats: (bars) => {
+    const b: number[] = [];
+    for (let i = 0; i < bars * 4; i++) {
+      b.push(i, i + 0.5, i + 0.75);
+    }
+    return b;
+  }},
+  // Bo Diddley beat
+  { id: 15, label: 'BoDd', getBeats: (bars) => {
+    const b: number[] = [];
+    for (let i = 0; i < bars; i++) {
+      b.push(i*4, i*4+0.5, i*4+1.5, i*4+2, i*4+3);
+    }
+    return b;
+  }},
+];
+
+// 10 pitch presets (melodic contour patterns)
+interface PitchPreset {
+  id: number;
+  label: string;
+  getOffsets: (noteCount: number) => number[];
+}
+
+const PITCH_PRESETS: PitchPreset[] = [
+  { id: 0, label: 'Flat', getOffsets: (n) => Array(n).fill(0) },
+  { id: 1, label: 'Up', getOffsets: (n) => Array.from({ length: n }, (_, i) => Math.round((i / Math.max(1, n - 1)) * 12)) },
+  { id: 2, label: 'Down', getOffsets: (n) => Array.from({ length: n }, (_, i) => Math.round((1 - i / Math.max(1, n - 1)) * 12) - 6) },
+  { id: 3, label: 'Wave', getOffsets: (n) => Array.from({ length: n }, (_, i) => Math.round(Math.sin((i / Math.max(1, n - 1)) * Math.PI * 2) * 6)) },
+  { id: 4, label: 'Saw', getOffsets: (n) => Array.from({ length: n }, (_, i) => (i % 4) * 3 - 6) },
+  { id: 5, label: 'Oct', getOffsets: (n) => Array.from({ length: n }, (_, i) => i % 2 === 0 ? 0 : 12) },
+  { id: 6, label: '5th', getOffsets: (n) => Array.from({ length: n }, (_, i) => i % 2 === 0 ? 0 : 7) },
+  { id: 7, label: 'Inv', getOffsets: (n) => Array.from({ length: n }, (_, i) => -Math.round((i / Math.max(1, n - 1)) * 12)) },
+  { id: 8, label: 'Arp', getOffsets: (n) => Array.from({ length: n }, (_, i) => [0, 4, 7, 12][i % 4]) },
+  { id: 9, label: 'Rnd', getOffsets: (n) => Array.from({ length: n }, () => Math.round(Math.random() * 12 - 6)) },
+];
 
 // Queued pattern change type
 interface QueuedPatternChange {
@@ -21,9 +231,10 @@ interface TimelineViewProps {
   onPreviewPattern?: (pattern: NoteEvent[], bars: number) => void;
   onStopPreview?: () => void;
   onPreviewNote?: (note: string) => void;
-  onVariationChange?: (loopId: string, variation: number, newPattern: NoteEvent[]) => void;
   onVolumeChange?: (loopId: string, volume: number) => void;
   onTransposeChange?: (loopId: string, transpose: number) => void;
+  onSoloChange?: (loopId: string, solo: boolean) => void;
+  soloedLoopId?: string | null;
   editableLoopIds?: string[];
   queuedChanges?: QueuedPatternChange[];
 }
@@ -88,9 +299,10 @@ export function TimelineView({
   onPreviewPattern,
   onStopPreview,
   onPreviewNote,
-  onVariationChange,
   onVolumeChange,
   onTransposeChange,
+  onSoloChange,
+  soloedLoopId,
   editableLoopIds = [],
   queuedChanges = [],
 }: TimelineViewProps) {
@@ -99,6 +311,35 @@ export function TimelineView({
   const [hoveredTrack, setHoveredTrack] = useState<string | null>(null);
   const [subdivision, setSubdivision] = useState<typeof SUBDIVISIONS[number]>(SUBDIVISIONS[1]); // Default 1/8
   const [previewingLoopId, setPreviewingLoopId] = useState<string | null>(null);
+
+  // Track which track has expanded pattern options
+  const [expandedTrackId, setExpandedTrackId] = useState<string | null>(null);
+
+  // Track previously seen active loop IDs to detect newly added tracks
+  const prevActiveLoopIdsRef = useRef<Set<string>>(new Set());
+
+  // Auto-expand newly activated tracks (only for current player's editable loops)
+  useEffect(() => {
+    // Get IDs of active loops that are editable by the current player
+    const activeEditableLoopIds = loops
+      .filter(loop => editableLoopIds.includes(loop.id))
+      .map(loop => loop.id);
+
+    const currentIds = new Set(activeEditableLoopIds);
+    const prevIds = prevActiveLoopIdsRef.current;
+
+    // Find any new loop IDs that weren't in the previous set
+    const newLoopIds = activeEditableLoopIds.filter(id => !prevIds.has(id));
+
+    // If there's a new active editable loop, auto-expand it
+    if (newLoopIds.length > 0) {
+      // Expand the most recently added one (last in array)
+      setExpandedTrackId(newLoopIds[newLoopIds.length - 1]);
+    }
+
+    // Update the ref for next comparison
+    prevActiveLoopIdsRef.current = currentIds;
+  }, [loops, editableLoopIds]);
 
   // Constants
   const BEATS_PER_BAR = 4;
@@ -207,14 +448,16 @@ export function TimelineView({
       const isActive = !loop.muted;
       const isHovered = hoveredTrack === loop.id;
       const isEditable = editableLoopIds.includes(loop.id);
+      const isExpanded = expandedTrackId === loop.id;
       const loopBeats = loop.bars * BEATS_PER_BAR;
+      const instrumentInfo = INSTRUMENT_INFO[loop.instrument];
 
       // Check for queued pattern
       const queuedChange = getQueuedPattern(loop.id);
       const hasQueuedChange = !!queuedChange;
 
       // Track background
-      ctx.fillStyle = isHovered && isEditable ? '#1a1a2e' : '#111118';
+      ctx.fillStyle = isExpanded ? '#1a1825' : (isHovered && isEditable ? '#1a1a2e' : '#111118');
       ctx.fillRect(0, trackY, width, trackHeight);
 
       // Track separator
@@ -226,26 +469,23 @@ export function TimelineView({
       ctx.stroke();
 
       // Track label area
-      ctx.fillStyle = hasQueuedChange ? '#1a1520' : '#151520';
+      ctx.fillStyle = isExpanded ? '#1f1a28' : (hasQueuedChange ? '#1a1520' : '#151520');
       ctx.fillRect(0, trackY, trackLabelWidth, trackHeight);
 
-      // Track name
-      ctx.fillStyle = isActive ? loop.color : '#555';
-      ctx.font = 'bold 11px monospace';
-      ctx.textAlign = 'left';
-      ctx.fillText(loop.name, 6, trackY + 16);
+      // Selection border for expanded track
+      if (isExpanded) {
+        ctx.strokeStyle = instrumentInfo?.color || '#4ade80';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(1, trackY + 1, trackLabelWidth - 2, trackHeight - 2);
+      }
 
-      // Loop info
-      ctx.fillStyle = '#555';
-      ctx.font = '9px monospace';
-      ctx.fillText(`${loop.bars}b`, 6, trackY + 28);
-
-      // Current position within THIS loop
+      // Track name + bars + position (all in one line)
       const loopPosition = cycleBeats % loopBeats;
       const loopBar = Math.floor(loopPosition / BEATS_PER_BAR) + 1;
-      ctx.fillStyle = isActive ? loop.color : '#444';
-      ctx.font = '9px monospace';
-      ctx.fillText(`${loopBar}/${loop.bars}`, 6, trackY + 40);
+      ctx.fillStyle = isActive ? loop.color : '#555';
+      ctx.font = 'bold 10px monospace';
+      ctx.textAlign = 'left';
+      ctx.fillText(`${loop.name} ${loopBar}/${loop.bars}`, 6, trackY + 14);
 
       // Queued change indicator with countdown
       if (hasQueuedChange) {
@@ -325,7 +565,59 @@ export function TimelineView({
 
       if (patternToDraw && patternToDraw.length > 0) {
         const repetitions = Math.ceil(motherLoopBeats / loopBeats);
+        const beatWidth = timelineWidth / motherLoopBeats;
 
+        // === DRAW INTENSITY BARS FIRST (BEHIND PITCH BARS) - always show ===
+        {
+          for (let rep = 0; rep < repetitions; rep++) {
+            const repStartBeat = rep * loopBeats;
+            const isSeedLoop = rep === 0;
+
+            patternToDraw.forEach((note: NoteEvent) => {
+              const noteBeatInMother = repStartBeat + note.time;
+              if (noteBeatInMother >= motherLoopBeats) return;
+
+              const velocity = note.velocity ?? 0.8;
+              const noteX = trackLabelWidth + (noteBeatInMother / motherLoopBeats) * timelineWidth;
+
+              // Intensity bar: width based on note duration, height based on velocity
+              const durationBeats = note.duration === '32n' ? 0.125 :
+                                    note.duration === '16n' ? 0.25 :
+                                    note.duration === '8n' ? 0.5 :
+                                    note.duration === '4n' ? 1 :
+                                    note.duration === '2n' ? 2 : 0.5;
+              const barWidth = Math.max(6, durationBeats * beatWidth);
+              const barHeight = velocity * (trackHeight - 4);
+
+              // Draw intensity bar from bottom
+              ctx.fillStyle = loop.color;
+              ctx.globalAlpha = isSeedLoop ? (isActive ? 0.25 : 0.1) : 0.05;
+              ctx.fillRect(
+                noteX - 1,
+                trackY + trackHeight - barHeight - 2,
+                barWidth,
+                barHeight
+              );
+              ctx.globalAlpha = 1;
+
+              // In expanded mode, show velocity percentage on seed loop notes
+              if (isExpanded && isSeedLoop && isEditable) {
+                ctx.fillStyle = '#fff';
+                ctx.globalAlpha = 0.6;
+                ctx.font = '7px monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText(
+                  `${Math.round(velocity * 100)}`,
+                  noteX + barWidth / 2,
+                  trackY + trackHeight - barHeight - 6
+                );
+                ctx.globalAlpha = 1;
+              }
+            });
+          }
+        }
+
+        // === DRAW PITCH/MIDI BARS (ON TOP) ===
         for (let rep = 0; rep < repetitions; rep++) {
           const repStartBeat = rep * loopBeats;
           const isSeedLoop = rep === 0;
@@ -350,7 +642,6 @@ export function TimelineView({
                                   note.duration === '4n' ? 1 :
                                   note.duration === '2n' ? 2 : 0.5;
             // Scale note width - use beat width as reference for better visibility
-            const beatWidth = timelineWidth / motherLoopBeats;
             const noteWidth = Math.max(4, durationBeats * beatWidth);
             const noteHeight = Math.max(4, trackHeight / PITCH_RANGE * 0.8);
 
@@ -436,10 +727,10 @@ export function TimelineView({
     ctx.fillStyle = '#444';
     ctx.font = '9px monospace';
     ctx.textAlign = 'left';
-    ctx.fillText('Click to add/remove notes • Orange = pending', trackLabelWidth + 5, height - 4);
+    ctx.fillText('Click to add/remove notes • Click ▼ for presets • Orange = pending', trackLabelWidth + 5, height - 4);
 
     animationRef.current = requestAnimationFrame(draw);
-  }, [loops, isPlaying, tempo, motherLoopBars, motherLoopBeats, editableLoopIds, hoveredTrack, queuedChanges, getQueuedPattern, BEATS_PER_BAR, subdivision]);
+  }, [loops, isPlaying, tempo, motherLoopBars, motherLoopBeats, editableLoopIds, hoveredTrack, queuedChanges, getQueuedPattern, BEATS_PER_BAR, subdivision, expandedTrackId]);
 
   // Mouse move for track hover
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -468,7 +759,8 @@ export function TimelineView({
     setHoveredTrack(null);
   }, []);
 
-  // Click to add/remove notes
+
+  // Click to add/remove notes or select loop for intensity editing
   const handleClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas || !onPatternChange) return;
@@ -482,14 +774,18 @@ export function TimelineView({
     const timelineWidth = canvas.width - trackLabelWidth;
     const trackHeight = loops.length > 0 ? (canvas.height - headerHeight) / loops.length : 0;
 
-    // Must be in timeline area
-    if (x < trackLabelWidth || y < headerHeight) return;
+    // Handle header clicks - ignore
+    if (y < headerHeight) return;
 
     // Find track
     const trackIndex = Math.floor((y - headerHeight) / trackHeight);
     if (trackIndex < 0 || trackIndex >= loops.length) return;
 
     const loop = loops[trackIndex];
+
+    // Must be in timeline area for note editing (track labels have their own buttons now)
+    if (x < trackLabelWidth) return;
+
     if (!editableLoopIds.includes(loop.id)) return;
 
     const loopBeats = loop.bars * BEATS_PER_BAR;
@@ -614,13 +910,31 @@ export function TimelineView({
   }, [draw]);
 
   // Calculate track positions for controls
-  // Fixed minimum track height ensures enough space for vertical volume slider
+  // Increased minimum track height for 3-row presets
   const headerHeight = 40;
-  const MIN_TRACK_HEIGHT = 70; // Fixed height per track for controls
+  const MIN_TRACK_HEIGHT = 110; // Increased height for 3 rows of presets
   const trackHeight = loops.length > 0 ? Math.max(MIN_TRACK_HEIGHT, (300 - headerHeight) / loops.length) : MIN_TRACK_HEIGHT;
 
   return (
-    <div style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <div
+      style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', flexDirection: 'column', flex: 1 }}
+    >
+      {/* Canvas is rendered first, controls overlay on top */}
+      <canvas
+        ref={canvasRef}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={handleMouseLeave}
+        onClick={handleClick}
+        style={{
+          width: '100%',
+          height: loops.length > 0 ? headerHeight + loops.length * MIN_TRACK_HEIGHT : 300,
+          minHeight: 300,
+          display: 'block',
+          background: '#0a0a0f',
+          cursor: editableLoopIds.length > 0 ? 'crosshair' : 'default',
+        }}
+      />
+
       {/* Subdivision selector */}
       <div style={{
         position: 'absolute',
@@ -656,7 +970,7 @@ export function TimelineView({
         ))}
       </div>
 
-      {/* Track controls overlay - positioned in the track label area (left side) */}
+      {/* Track controls - positioned at the right edge of the track area */}
       {loops.map((loop, index) => {
         const isEditable = editableLoopIds.includes(loop.id);
         const hasQueued = queuedChanges.some(c => c.loopId === loop.id);
@@ -665,178 +979,279 @@ export function TimelineView({
 
         if (!isEditable) return null;
 
-        const handleVariationSelect = (newVariation: number) => {
-          if (onVariationChange && loop.instrument) {
-            const generator = patternGenerators[loop.instrument as InstrumentType];
-            if (generator) {
-              const newPattern = generator(loop.bars, newVariation);
-              onVariationChange(loop.id, newVariation, newPattern);
-            }
-          }
+        const trackTop = headerHeight + index * trackHeight;
+        const isExpanded = expandedTrackId === loop.id;
+        const noteCount = loop.pattern.length;
+
+        // Helper to apply pitch preset
+        const applyPitchPreset = (preset: PitchPreset) => {
+          if (!onPatternChange || noteCount === 0) return;
+          const offsets = preset.getOffsets(noteCount);
+          const basePattern = loop.pattern;
+          // Get the base pitch from the first note
+          const basePitch = noteToPitch(basePattern[0]?.note || 'C4');
+          const newPattern: NoteEvent[] = basePattern.map((note, i) => ({
+            ...note,
+            note: pitchToNote(basePitch + offsets[i])
+          }));
+          onPatternChange(loop.id, newPattern);
         };
 
-        // Calculate track position - controls go at BOTTOM of track label area
-        // Track label area: 80px wide, starts at headerHeight (40px)
-        // Text labels in canvas: name at +16, bars at +28, position at +40
-        // Controls should go below the text, at the bottom of the track
-        const trackTop = headerHeight + index * trackHeight;
-        const controlsTop = trackTop + 44; // Below the text labels
+        // Helper to apply rhythm preset
+        const applyRhythmPreset = (preset: RhythmPreset) => {
+          if (!onPatternChange) return;
+          const beats = preset.getBeats(loop.bars);
+          // Keep existing pitches and velocities, just redistribute timing
+          const oldPattern = loop.pattern;
+          const duration = beats.length > 8 ? '16n' : beats.length > 16 ? '32n' : '8n';
+          const newPattern: NoteEvent[] = beats.map((time, i) => ({
+            note: oldPattern[i % oldPattern.length]?.note || 'C4',
+            time,
+            duration,
+            velocity: oldPattern[i % oldPattern.length]?.velocity || 0.8
+          }));
+          onPatternChange(loop.id, newPattern);
+        };
+
+        // Helper to apply intensity preset
+        const applyIntensityPreset = (preset: IntensityPreset, isRandom: boolean) => {
+          if (!onPatternChange || noteCount === 0) return;
+          const velocities = isRandom
+            ? Array.from({ length: noteCount }, () => 0.2 + Math.random() * 0.8)
+            : preset.velocities;
+          const newPattern: NoteEvent[] = loop.pattern.map((note, j) => ({
+            ...note,
+            velocity: velocities[j]
+          }));
+          onPatternChange(loop.id, newPattern);
+        };
 
         return (
           <div key={`controls-${loop.id}`} style={{
             position: 'absolute',
-            left: 4,
-            top: controlsTop,
-            width: 72, // Fit within the 80px track label area
+            right: 8,
+            top: trackTop + 2,
             display: 'flex',
             flexDirection: 'column',
-            gap: 3,
-            zIndex: 10,
+            gap: 2,
+            zIndex: isExpanded ? 100 : 20,
+            background: 'rgba(10, 10, 15, 0.95)',
+            padding: 4,
+            borderRadius: 6,
+            border: `1px solid ${instrumentInfo?.color || '#333'}${isExpanded ? '88' : '33'}`,
+            boxShadow: isExpanded ? '0 4px 20px rgba(0,0,0,0.6)' : 'none',
           }}>
-            {/* Row 1: Variation dropdown + Preview + Volume label */}
-            <div style={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-              {/* Variation dropdown */}
-              <select
-                value={loop.variation ?? 0}
-                onChange={(e) => handleVariationSelect(parseInt(e.target.value))}
-                style={{
-                  width: 28,
-                  height: 16,
-                  background: '#1a1a2e',
-                  color: instrumentInfo?.color || '#fff',
-                  border: `1px solid ${instrumentInfo?.color || '#444'}`,
-                  borderRadius: 2,
-                  fontSize: 9,
-                  fontFamily: 'monospace',
-                  fontWeight: 'bold',
-                  cursor: 'pointer',
-                  textAlign: 'center',
-                  padding: 0,
-                }}
-                title={`Pattern variation (${VARIATION_LABELS.join(', ')})`}
-              >
-                {VARIATION_LABELS.map((label, i) => (
-                  <option key={label} value={i}>{label}</option>
-                ))}
-              </select>
+            {/* Row 1: Controls always visible on top */}
+            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+              {/* Volume */}
+              <input
+                type="range"
+                min="0" max="2" step="0.05"
+                value={loop.volume}
+                onChange={(e) => onVolumeChange?.(loop.id, parseFloat(e.target.value))}
+                style={{ width: isExpanded ? 60 : 40, height: 3, cursor: 'pointer' }}
+                title={`Vol: ${Math.round(loop.volume * 100)}%`}
+              />
 
-              {/* Preview button */}
+              {/* Transpose */}
+              <button onClick={() => onTransposeChange?.(loop.id, loop.transpose - 1)} disabled={loop.transpose <= -12}
+                style={{ width: 14, height: 14, background: '#252542', color: '#888', border: 'none', borderRadius: 2, fontSize: 9, cursor: 'pointer', opacity: loop.transpose <= -12 ? 0.3 : 1 }}>−</button>
+              <span style={{ fontSize: 8, fontFamily: 'monospace', width: 18, textAlign: 'center', color: loop.transpose === 0 ? '#555' : '#4ade80' }}>
+                {loop.transpose > 0 ? `+${loop.transpose}` : loop.transpose}
+              </span>
+              <button onClick={() => onTransposeChange?.(loop.id, loop.transpose + 1)} disabled={loop.transpose >= 12}
+                style={{ width: 14, height: 14, background: '#252542', color: '#888', border: 'none', borderRadius: 2, fontSize: 9, cursor: 'pointer', opacity: loop.transpose >= 12 ? 0.3 : 1 }}>+</button>
+
+              {/* Expand/collapse button */}
+              <button
+                onClick={(e) => { e.stopPropagation(); setExpandedTrackId(isExpanded ? null : loop.id); }}
+                style={{
+                  width: 18, height: 14,
+                  background: isExpanded ? instrumentInfo?.color || '#4ade80' : '#252542',
+                  color: isExpanded ? '#000' : '#888',
+                  border: 'none', borderRadius: 2,
+                  fontSize: 8, cursor: 'pointer', fontWeight: 'bold',
+                }}
+                title={isExpanded ? 'Hide presets' : 'Show presets'}
+              >{isExpanded ? '▲' : '▼'}</button>
+
+              {/* Solo */}
+              <button
+                onClick={() => onSoloChange?.(loop.id, soloedLoopId !== loop.id)}
+                style={{
+                  width: 18, height: 14,
+                  background: soloedLoopId === loop.id ? '#eab308' : '#252542',
+                  color: soloedLoopId === loop.id ? '#000' : '#888',
+                  border: 'none', borderRadius: 2,
+                  fontSize: 8, cursor: 'pointer',
+                  fontWeight: 'bold',
+                }}
+                title={soloedLoopId === loop.id ? 'Unsolo' : 'Solo this track'}
+              >S</button>
+
+              {/* Preview */}
               <button
                 onClick={() => isPreviewing ? handleStopPreview() : handlePreview(loop.id)}
                 style={{
-                  width: 16,
-                  height: 16,
+                  width: 18, height: 14,
                   background: isPreviewing ? '#f59e0b' : hasQueued ? '#3b82f6' : '#252542',
                   color: isPreviewing ? '#000' : '#fff',
-                  border: 'none',
-                  borderRadius: 2,
-                  fontSize: 7,
-                  fontFamily: 'monospace',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
+                  border: 'none', borderRadius: 2,
+                  fontSize: 8, cursor: 'pointer',
                   opacity: loop.pattern.length > 0 || hasQueued ? 1 : 0.3,
                 }}
-                title={isPreviewing ? 'Stop preview' : 'Preview pattern'}
-                disabled={loop.pattern.length === 0 && !hasQueued}
-              >
-                {isPreviewing ? '■' : '▶'}
-              </button>
-
-              {/* Volume value */}
-              <span style={{
-                fontSize: 8,
-                fontFamily: 'monospace',
-                color: instrumentInfo?.color || '#666',
-                marginLeft: 2,
-              }}>
-                {loop.volume <= 0 ? '0' : loop.volume >= 2 ? '2x' : `${Math.round(loop.volume * 100)}%`}
-              </span>
+                title={isPreviewing ? 'Stop' : 'Preview'}
+              >{isPreviewing ? '■' : '▶'}</button>
             </div>
 
-            {/* Vertical volume slider */}
-            <input
-              type="range"
-              className="slim-slider"
-              min="0"
-              max="2"
-              step="0.05"
-              value={loop.volume}
-              onChange={(e) => onVolumeChange?.(loop.id, parseFloat(e.target.value))}
-              style={{
-                width: 36,
-                color: instrumentInfo?.color || '#3b82f6',
-                cursor: 'pointer',
-                transform: 'rotate(-90deg)',
-                transformOrigin: 'left center',
-                marginTop: 18,
-                marginLeft: 30,
-              }}
-              title={`Volume: ${Math.round(loop.volume * 100)}%`}
-            />
+            {/* Expanded: Combined preview + 3 scrollable rows */}
+            {isExpanded && (() => {
+              // Different heights for each row type
+              const pitchRowHeight = 24;   // Pitch contour
+              const rhythmRowHeight = 20;  // Taller rhythm bars for visibility
+              const intensityRowHeight = 24; // Intensity bars
+              const previewWidth = 48;     // Preview width for P and I
+              const combinedHeight = 68;   // Combined preview height
 
-            {/* Transpose slider */}
-            <div style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              marginLeft: 4,
-              gap: 1,
-            }}>
-              <span style={{
-                fontSize: 7,
-                color: '#666',
-                fontWeight: 600,
-              }}>
-                T
-              </span>
-              <input
-                type="range"
-                className="slim-slider"
-                min="-12"
-                max="12"
-                step="1"
-                value={loop.transpose}
-                onChange={(e) => onTransposeChange?.(loop.id, parseInt(e.target.value))}
-                style={{
-                  width: 36,
-                  color: loop.transpose === 0 ? '#666' : loop.transpose > 0 ? '#4ade80' : '#f472b6',
-                  cursor: 'pointer',
-                  transform: 'rotate(-90deg)',
-                  transformOrigin: 'left center',
-                  marginTop: 18,
-                  marginLeft: 30,
-                }}
-                title={`Transpose: ${loop.transpose > 0 ? '+' : ''}${loop.transpose} semitones`}
-              />
-              <span style={{
-                fontSize: 8,
-                fontFamily: 'monospace',
-                color: loop.transpose === 0 ? '#666' : loop.transpose > 0 ? '#4ade80' : '#f472b6',
-                fontWeight: loop.transpose === 0 ? 'normal' : 'bold',
-              }}>
-                {loop.transpose === 0 ? '0' : loop.transpose > 0 ? `+${loop.transpose}` : loop.transpose}
-              </span>
-            </div>
+              // Use queued pattern if exists, otherwise current pattern
+              const queuedForThisLoop = queuedChanges.find(c => c.loopId === loop.id);
+              const activePattern = queuedForThisLoop ? queuedForThisLoop.pattern : loop.pattern;
+              const activeNoteCount = activePattern.length;
+
+              // Create a hash key that changes when pattern changes (for live update)
+              const patternKey = activePattern.map(n => `${n.note}-${n.time}-${n.velocity?.toFixed(2)}`).join('|');
+
+              // Detect which presets match the ACTIVE pattern (queued or current)
+              // For pitch: compare pitch offsets from base note
+              const currentPitchOffsets = activeNoteCount > 0 ? (() => {
+                const basePitch = noteToPitch(activePattern[0]?.note || 'C4');
+                return activePattern.map(n => noteToPitch(n.note) - basePitch);
+              })() : [];
+
+              const matchingPitchPresetId = PITCH_PRESETS.find(preset => {
+                if (preset.label === 'Rnd') return false; // Random never matches
+                const presetOffsets = preset.getOffsets(activeNoteCount);
+                if (presetOffsets.length !== currentPitchOffsets.length) return false;
+                return presetOffsets.every((off, i) => Math.abs(off - currentPitchOffsets[i]) < 1);
+              })?.id;
+
+              // For rhythm: compare beat timings
+              const currentBeats = activePattern.map(n => n.time);
+              const matchingRhythmPresetId = RHYTHM_PRESETS.find(preset => {
+                const presetBeats = preset.getBeats(loop.bars);
+                if (presetBeats.length !== currentBeats.length) return false;
+                return presetBeats.every((beat, i) => Math.abs(beat - currentBeats[i]) < 0.1);
+              })?.id;
+
+              // For intensity: compare velocities
+              const currentVelocities = activePattern.map(n => n.velocity ?? 0.8);
+              // Regenerate intensity presets based on active note count
+              const activeIntensityPresets = generateIntensityPresets(activeNoteCount);
+              const matchingIntensityPresetId = activeIntensityPresets.findIndex(preset => {
+                if (preset.velocities.length !== currentVelocities.length) return false;
+                return preset.velocities.every((vel, i) => Math.abs(vel - currentVelocities[i]) < 0.05);
+              });
+
+              return (
+                <div style={{ display: 'flex', gap: 8, borderTop: `1px solid ${instrumentInfo?.color}44`, paddingTop: 4, marginTop: 2, width: 520 }}>
+                  {/* Combined preview on left - shows queued pattern if exists, otherwise current */}
+                  {(() => {
+                    // Check if there's a queued pattern for this loop
+                    const queuedChange = queuedChanges.find(c => c.loopId === loop.id);
+                    const displayPattern = queuedChange ? queuedChange.pattern : loop.pattern;
+                    const displayKey = queuedChange
+                      ? displayPattern.map(n => `${n.note}-${n.time}-${n.velocity?.toFixed(2)}`).join('|')
+                      : patternKey;
+                    return (
+                      <CombinedPatternPreview
+                        key={displayKey}
+                        pattern={displayPattern}
+                        bars={loop.bars}
+                        height={combinedHeight}
+                        color={instrumentInfo?.color || '#4ade80'}
+                        label={queuedChange ? 'Pending pattern' : 'Current pattern'}
+                      />
+                    );
+                  })()}
+
+                  {/* 3 scrollable rows on right - no maxWidth, allow scrolling */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 3, flex: 1, minWidth: 0 }}>
+                    {/* Row 1: Pitch presets - taller, scrollable */}
+                    <div style={{ display: 'flex', gap: 2, alignItems: 'center', height: pitchRowHeight }}>
+                      <span style={{ fontSize: 8, color: '#4ade80', width: 12, fontWeight: 'bold', flexShrink: 0 }}>P</span>
+                      <div style={{ display: 'flex', gap: 3, overflowX: 'auto', flex: 1, scrollbarWidth: 'thin', paddingBottom: 2 }}>
+                        {PITCH_PRESETS.map(preset => {
+                          const offsets = preset.getOffsets(8);
+                          return (
+                            <MiniPitchPreview
+                              key={preset.id}
+                              offsets={offsets}
+                              width={previewWidth}
+                              height={pitchRowHeight - 4}
+                              color="#4ade80"
+                              isRandom={preset.label === 'Rnd'}
+                              isSelected={matchingPitchPresetId === preset.id}
+                              onClick={() => applyPitchPreset(preset)}
+                              label={preset.label}
+                            />
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Row 2: Rhythm presets - slim but wider, scrollable */}
+                    <div style={{ display: 'flex', gap: 2, alignItems: 'center', height: rhythmRowHeight }}>
+                      <span style={{ fontSize: 8, color: '#3b82f6', width: 12, fontWeight: 'bold', flexShrink: 0 }}>R</span>
+                      <div style={{ display: 'flex', gap: 4, overflowX: 'auto', flex: 1, scrollbarWidth: 'thin', paddingBottom: 2 }}>
+                        {RHYTHM_PRESETS.map(preset => {
+                          const beats = preset.getBeats(loop.bars);
+                          return (
+                            <MiniRhythmPreview
+                              key={preset.id}
+                              beats={beats.slice(0, 64)}
+                              bars={loop.bars}
+                              width={72}
+                              height={rhythmRowHeight - 2}
+                              color="#3b82f6"
+                              isSelected={matchingRhythmPresetId === preset.id}
+                              onClick={() => applyRhythmPreset(preset)}
+                              label={preset.label}
+                            />
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Row 3: Intensity presets - taller, scrollable */}
+                    <div style={{ display: 'flex', gap: 2, alignItems: 'center', height: intensityRowHeight }}>
+                      <span style={{ fontSize: 8, color: '#f472b6', width: 12, fontWeight: 'bold', flexShrink: 0 }}>I</span>
+                      <div style={{ display: 'flex', gap: 3, overflowX: 'auto', flex: 1, scrollbarWidth: 'thin', paddingBottom: 2 }}>
+                        {activeIntensityPresets.map((preset, i) => {
+                          const isRandom = i === activeIntensityPresets.length - 1;
+                          return (
+                            <MiniIntensityPreview
+                              key={preset.id}
+                              velocities={preset.velocities}
+                              width={previewWidth}
+                              height={intensityRowHeight - 4}
+                              color="#f472b6"
+                              isRandom={isRandom}
+                              isSelected={matchingIntensityPresetId === i}
+                              onClick={() => applyIntensityPreset(preset, isRandom)}
+                              label={isRandom ? 'Random' : `Preset ${i + 1}`}
+                            />
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
           </div>
         );
       })}
-
-      <canvas
-        ref={canvasRef}
-        onMouseMove={handleMouseMove}
-        onMouseLeave={handleMouseLeave}
-        onClick={handleClick}
-        style={{
-          width: '100%',
-          height: loops.length > 0 ? headerHeight + loops.length * MIN_TRACK_HEIGHT : 300,
-          minHeight: 300,
-          display: 'block',
-          background: '#0a0a0f',
-          cursor: editableLoopIds.length > 0 ? 'crosshair' : 'default',
-        }}
-      />
     </div>
   );
 }

@@ -2,7 +2,6 @@ import * as Tone from 'tone';
 import type { Loop, TransportState, ClockSync, NoteEvent, InstrumentType } from '../types';
 
 // Drum note mapping (using different notes for different drum sounds)
-// C1=Kick, D1=Snare, E1=HiHat Closed, F1=HiHat Open, G1=Clap, A1=Tom, B1=Rim
 const DRUM_NOTES = {
   kick: 'C1',
   snare: 'D1',
@@ -26,60 +25,59 @@ function transposeNote(note: string, semitones: number): string {
   const noteName = match[1];
   const octave = parseInt(match[2]);
 
-  // Convert to MIDI-like pitch
   const noteIndex = NOTE_NAMES.indexOf(noteName);
   if (noteIndex === -1) return note;
 
   const totalSemitones = octave * 12 + noteIndex + semitones;
   const newOctave = Math.floor(totalSemitones / 12);
-  const newNoteIndex = ((totalSemitones % 12) + 12) % 12; // Handle negative
+  const newNoteIndex = ((totalSemitones % 12) + 12) % 12;
 
   return `${NOTE_NAMES[newNoteIndex]}${newOctave}`;
 }
 
 export class AudioEngine {
   private synths: Map<string, Tone.PolySynth | Tone.MembraneSynth | Tone.NoiseSynth | Tone.MetalSynth> = new Map();
-  private sequences: Map<string, Tone.Sequence> = new Map();
-  private loopBars: Map<string, number> = new Map(); // Store loop bar lengths
-  private loopInstruments: Map<string, InstrumentType> = new Map(); // Store loop instrument types
-  private loopTranspose: Map<string, number> = new Map(); // Store loop transpose (-12 to +12 semitones)
-  private loopMuted: Map<string, boolean> = new Map(); // Store loop muted state (for dynamic lookup in Part callback)
+  private sequences: Map<string, Tone.Part> = new Map();
+  private loopBars: Map<string, number> = new Map();
+  private loopInstruments: Map<string, InstrumentType> = new Map();
+  private loopTranspose: Map<string, number> = new Map();
+  private loopMuted: Map<string, boolean> = new Map();
   private isStarted = false;
   private onBeatCallback?: (beat: number, bar: number) => void;
   private beatsPerBar = 4;
 
-  // Master gain for fade in/out
   private masterGain: Tone.Gain;
+  private clockOffset = 0;
+  private latency = 0;
 
-  // Clock sync state
-  private clockOffset = 0; // Offset from leader's clock in ms
-  private latency = 0; // Measured network latency in ms
-
-  // Preview/audition synth (separate from main mix)
   private previewSynth: Tone.PolySynth | null = null;
   private previewPart: Tone.Part | null = null;
   private isPreviewPlaying = false;
-
-  // Fade state
   private isFading = false;
 
-  // Per-loop drum kits (each drum loop gets its own kit to avoid timing conflicts)
+  private onLoopStateChangeCallback?: (loopId: string, isPlaying: boolean) => void;
+
   private drumKits: Map<string, {
     kick: Tone.MembraneSynth;
     snare: Tone.NoiseSynth;
     hihat: Tone.MetalSynth;
   }> = new Map();
 
+  private pendingMuteChanges: Map<string, { muted: boolean; scheduledId?: number }> = new Map();
+  private pendingPatternChanges: Map<string, NoteEvent[]> = new Map();
+  private loopPatterns: Map<string, NoteEvent[]> = new Map();
+
   constructor() {
-    // Set up transport
     Tone.getTransport().bpm.value = 120;
     Tone.getTransport().timeSignature = this.beatsPerBar;
 
-    // Create master gain for fade in/out
+    // Use default Tone.js values for maximum stability
+    // lookAhead=0.1, updateInterval=0.05 are the defaults
+    Tone.getContext().lookAhead = 0.1;
+    (Tone.getContext() as unknown as { updateInterval: number }).updateInterval = 0.05;
+
     this.masterGain = new Tone.Gain(1).toDestination();
 
-    // Create preview synth with distinct sound (slightly different from main)
-    // Preview goes directly to destination (not through master gain) so it plays during fade
     this.previewSynth = new Tone.PolySynth(Tone.Synth, {
       oscillator: { type: 'sine' },
       envelope: {
@@ -89,17 +87,14 @@ export class AudioEngine {
         release: 0.5,
       },
     }).toDestination();
-    this.previewSynth.volume.value = -6; // Slightly quieter than main
+    this.previewSynth.volume.value = -6;
   }
 
-  // Create a drum kit for a specific loop
   private createDrumKitForLoop(loopId: string): void {
-    // Also reinitialize master gain if needed
     if (!this.masterGain || this.masterGain.disposed) {
       this.masterGain = new Tone.Gain(1).toDestination();
     }
 
-    // Clean up existing kit for this loop if any
     const existingKit = this.drumKits.get(loopId);
     if (existingKit) {
       existingKit.kick.dispose();
@@ -108,37 +103,20 @@ export class AudioEngine {
     }
 
     const drumKit = {
-      // Kick drum - deep membrane
       kick: new Tone.MembraneSynth({
         pitchDecay: 0.05,
         octaves: 6,
         oscillator: { type: 'sine' },
-        envelope: {
-          attack: 0.001,
-          decay: 0.4,
-          sustain: 0.01,
-          release: 0.4,
-        },
+        envelope: { attack: 0.001, decay: 0.4, sustain: 0.01, release: 0.4 },
       }).connect(this.masterGain),
 
-      // Snare - noise burst
       snare: new Tone.NoiseSynth({
         noise: { type: 'white' },
-        envelope: {
-          attack: 0.001,
-          decay: 0.2,
-          sustain: 0,
-          release: 0.1,
-        },
+        envelope: { attack: 0.001, decay: 0.2, sustain: 0, release: 0.1 },
       }).connect(this.masterGain),
 
-      // Hi-hat - metallic
       hihat: new Tone.MetalSynth({
-        envelope: {
-          attack: 0.001,
-          decay: 0.1,
-          release: 0.01,
-        },
+        envelope: { attack: 0.001, decay: 0.1, release: 0.01 },
         harmonicity: 5.1,
         modulationIndex: 32,
         resonance: 4000,
@@ -153,115 +131,74 @@ export class AudioEngine {
     this.drumKits.set(loopId, drumKit);
   }
 
-  // Create synth based on instrument type
   private createSynthForInstrument(instrument: InstrumentType, volume: number): Tone.PolySynth {
+    if (!this.masterGain || this.masterGain.disposed) {
+      this.masterGain = new Tone.Gain(1).toDestination();
+    }
+
     let synth: Tone.PolySynth;
 
     switch (instrument) {
       case 'drums':
-        // Drums use shared drum kit, but we still need a placeholder synth
-        // The actual drum sounds are handled in the sequence callback
         synth = new Tone.PolySynth(Tone.Synth, {
           oscillator: { type: 'sine' },
           envelope: { attack: 0.001, decay: 0.1, sustain: 0, release: 0.1 },
         }).connect(this.masterGain);
-        synth.volume.value = -Infinity; // Mute - we use drum kit instead
+        synth.volume.value = -Infinity;
         break;
 
       case 'bass':
-        // Deep, punchy bass
         synth = new Tone.PolySynth(Tone.Synth, {
           oscillator: { type: 'sawtooth' },
-          envelope: {
-            attack: 0.01,
-            decay: 0.3,
-            sustain: 0.4,
-            release: 0.3,
-          },
+          envelope: { attack: 0.01, decay: 0.3, sustain: 0.4, release: 0.3 },
         }).connect(this.masterGain);
         synth.volume.value = Tone.gainToDb(volume) - 3;
         break;
 
       case 'chord':
-        // Warm pad chords
         synth = new Tone.PolySynth(Tone.Synth, {
           oscillator: { type: 'sine' },
-          envelope: {
-            attack: 0.3,
-            decay: 0.5,
-            sustain: 0.7,
-            release: 1.0,
-          },
+          envelope: { attack: 0.3, decay: 0.5, sustain: 0.7, release: 1.0 },
         }).connect(this.masterGain);
         synth.volume.value = Tone.gainToDb(volume) - 6;
         break;
 
       case 'arpeggio':
-        // Classic Glass-style arpeggio (triangle for clarity)
         synth = new Tone.PolySynth(Tone.Synth, {
           oscillator: { type: 'triangle' },
-          envelope: {
-            attack: 0.02,
-            decay: 0.1,
-            sustain: 0.3,
-            release: 0.8,
-          },
+          envelope: { attack: 0.02, decay: 0.1, sustain: 0.3, release: 0.8 },
         }).connect(this.masterGain);
         synth.volume.value = Tone.gainToDb(volume);
         break;
 
       case 'lead':
-        // Bright, cutting lead
         synth = new Tone.PolySynth(Tone.Synth, {
           oscillator: { type: 'square' },
-          envelope: {
-            attack: 0.01,
-            decay: 0.2,
-            sustain: 0.5,
-            release: 0.4,
-          },
+          envelope: { attack: 0.01, decay: 0.2, sustain: 0.5, release: 0.4 },
         }).connect(this.masterGain);
         synth.volume.value = Tone.gainToDb(volume) - 3;
         break;
 
       case 'fx':
-        // Atmospheric/textural
         synth = new Tone.PolySynth(Tone.Synth, {
           oscillator: { type: 'sine' },
-          envelope: {
-            attack: 0.5,
-            decay: 1.0,
-            sustain: 0.3,
-            release: 2.0,
-          },
+          envelope: { attack: 0.5, decay: 1.0, sustain: 0.3, release: 2.0 },
         }).connect(this.masterGain);
         synth.volume.value = Tone.gainToDb(volume) - 9;
         break;
 
       case 'vocal':
-        // Vocal-like formant sound
         synth = new Tone.PolySynth(Tone.Synth, {
           oscillator: { type: 'sine' },
-          envelope: {
-            attack: 0.1,
-            decay: 0.3,
-            sustain: 0.6,
-            release: 0.5,
-          },
+          envelope: { attack: 0.1, decay: 0.3, sustain: 0.6, release: 0.5 },
         }).connect(this.masterGain);
         synth.volume.value = Tone.gainToDb(volume) - 3;
         break;
 
       default:
-        // Default synth
         synth = new Tone.PolySynth(Tone.Synth, {
           oscillator: { type: 'triangle' },
-          envelope: {
-            attack: 0.02,
-            decay: 0.1,
-            sustain: 0.3,
-            release: 0.8,
-          },
+          envelope: { attack: 0.02, decay: 0.1, sustain: 0.3, release: 0.8 },
         }).connect(this.masterGain);
         synth.volume.value = Tone.gainToDb(volume);
     }
@@ -269,9 +206,7 @@ export class AudioEngine {
     return synth;
   }
 
-  // Play drum sound based on note (using per-loop drum kit)
-  private playDrumNote(loopId: string, note: string, time: Tone.Unit.Time): void {
-    // Get or create drum kit for this loop
+  private playDrumNote(loopId: string, note: string, time: Tone.Unit.Time, velocity: number = 0.8): void {
     let drumKit = this.drumKits.get(loopId);
     if (!drumKit) {
       this.createDrumKitForLoop(loopId);
@@ -280,16 +215,15 @@ export class AudioEngine {
     if (!drumKit) return;
 
     if (note === DRUM_NOTES.kick || note.includes('C1') || note.includes('C2')) {
-      drumKit.kick.triggerAttackRelease('C1', '8n', time);
+      drumKit.kick.triggerAttackRelease('C1', '8n', time, velocity);
     } else if (note === DRUM_NOTES.snare || note.includes('D1') || note.includes('D2')) {
-      drumKit.snare.triggerAttackRelease('8n', time);
+      drumKit.snare.triggerAttackRelease('8n', time, velocity);
     } else if (note === DRUM_NOTES.hihat || note.includes('E1') || note.includes('F1') || note.includes('E2')) {
-      drumKit.hihat.triggerAttackRelease('32n', time);
+      drumKit.hihat.triggerAttackRelease('32n', time, velocity);
     } else if (note === DRUM_NOTES.clap || note.includes('G1')) {
-      drumKit.snare.triggerAttackRelease('16n', time);
+      drumKit.snare.triggerAttackRelease('16n', time, velocity);
     } else {
-      // Default to hi-hat for other notes
-      drumKit.hihat.triggerAttackRelease('32n', time);
+      drumKit.hihat.triggerAttackRelease('32n', time, velocity);
     }
   }
 
@@ -298,7 +232,6 @@ export class AudioEngine {
       await Tone.start();
       this.isStarted = true;
 
-      // Set up beat tracking
       Tone.getTransport().scheduleRepeat((time) => {
         const position = Tone.getTransport().position as string;
         const [bars, beats] = position.split(':').map(Number);
@@ -321,53 +254,56 @@ export class AudioEngine {
   }
 
   play(): void {
+    // Unmute all pending tracks when play starts
+    this.pendingMuteChanges.forEach((pending, loopId) => {
+      if (!pending.muted && pending.scheduledId === undefined) {
+        this.loopMuted.set(loopId, false);
+      }
+    });
+    this.pendingMuteChanges.forEach((pending, loopId) => {
+      if (pending.scheduledId === undefined) {
+        this.pendingMuteChanges.delete(loopId);
+      }
+    });
+
     Tone.getTransport().start();
   }
 
-  // Synchronized play - start at a coordinated time
   playSynced(startTime: number): void {
     const now = performance.now();
     const adjustedStartTime = startTime - this.clockOffset;
     const delay = Math.max(0, adjustedStartTime - now);
 
     if (delay > 0) {
-      // Schedule start for the future
       setTimeout(() => {
         Tone.getTransport().start();
       }, delay);
     } else {
-      // Start immediately but adjust position based on how late we are
       const lateBars = this.msToSeconds(Math.abs(delay)) * (this.getTempo() / 60) / this.beatsPerBar;
       Tone.getTransport().start(undefined, `${Math.floor(lateBars)}:0:0`);
     }
   }
 
-  // Stop with fade-out over 2 beats
   stop(): void {
-    if (this.isFading) return; // Already fading
+    if (this.isFading) return;
 
-    // Calculate fade duration: 2 beats at current tempo
     const bpm = this.getTempo();
-    const fadeSeconds = (2 * 60) / bpm; // 2 beats in seconds
+    const fadeSeconds = (2 * 60) / bpm;
 
     this.isFading = true;
 
-    // Ramp down master gain over 2 beats
     const now = Tone.now();
     this.masterGain.gain.setValueAtTime(1, now);
     this.masterGain.gain.linearRampToValueAtTime(0, now + fadeSeconds);
 
-    // After fade completes, stop transport and reset
     setTimeout(() => {
       Tone.getTransport().stop();
       Tone.getTransport().position = 0;
-      // Reset master gain for next play
       this.masterGain.gain.setValueAtTime(1, Tone.now());
       this.isFading = false;
-    }, fadeSeconds * 1000 + 50); // Add small buffer
+    }, fadeSeconds * 1000 + 50);
   }
 
-  // Immediate stop without fade (for dispose, etc.)
   stopImmediate(): void {
     this.isFading = false;
     this.masterGain.gain.cancelScheduledValues(Tone.now());
@@ -388,6 +324,10 @@ export class AudioEngine {
     this.onBeatCallback = callback;
   }
 
+  onLoopStateChange(callback: (loopId: string, isPlaying: boolean) => void): void {
+    this.onLoopStateChangeCallback = callback;
+  }
+
   getTransportState(): TransportState {
     const position = Tone.getTransport().position as string;
     const [bars, beats] = position.split(':').map(Number);
@@ -401,35 +341,27 @@ export class AudioEngine {
     };
   }
 
-  // Check if a loop exists
   hasLoop(loopId: string): boolean {
     return this.sequences.has(loopId);
   }
 
-  // Create a looping synth pattern for a loop
   createLoop(loop: Loop): void {
-    // If loop already exists, just update muted state - don't recreate
     if (this.sequences.has(loop.id)) {
       this.loopMuted.set(loop.id, loop.muted);
       return;
     }
 
-    // Get instrument type (default to arpeggio for backwards compatibility)
     const instrument = loop.instrument || 'arpeggio';
-
-    // Create synth based on instrument type
     const synth = this.createSynthForInstrument(instrument, loop.volume);
     this.synths.set(loop.id, synth);
     this.loopBars.set(loop.id, loop.bars);
     this.loopInstruments.set(loop.id, instrument);
     this.loopTranspose.set(loop.id, loop.transpose || 0);
-    this.loopMuted.set(loop.id, loop.muted); // Store initial muted state
+    this.loopMuted.set(loop.id, true);
 
-    // Calculate the loop duration in bars
     const loopDuration = `${loop.bars}m`;
     const loopId = loop.id;
 
-    // Use the loop's actual pattern if it has one
     if (loop.pattern && loop.pattern.length > 0) {
       type PartEvent = { time: string; note: NoteEvent };
       const partEvents: PartEvent[] = loop.pattern.map(n => ({
@@ -437,55 +369,125 @@ export class AudioEngine {
         note: n
       }));
 
-      // For drums, use drum kit; for others, use the synth
       const isDrums = instrument === 'drums';
 
       const part = new Tone.Part<PartEvent>((time, event) => {
-        // Look up muted state dynamically (not from closure)
         const isMuted = this.loopMuted.get(loopId) ?? false;
         if (!isMuted) {
-          // Get current transpose value (can change during playback)
           const transpose = this.loopTranspose.get(loopId) || 0;
           const playNote = isDrums ? event.note.note : transposeNote(event.note.note, transpose);
 
           if (isDrums) {
-            this.playDrumNote(loopId, playNote, time);
+            this.playDrumNote(loopId, playNote, time, event.note.velocity || 0.8);
           } else {
-            synth.triggerAttackRelease(
-              playNote,
-              event.note.duration,
-              time,
-              event.note.velocity || 0.8
-            );
+            synth.triggerAttackRelease(playNote, event.note.duration, time, event.note.velocity || 0.8);
           }
         }
       }, partEvents);
 
       part.loop = true;
       part.loopEnd = loopDuration;
-      this.sequences.set(loop.id, part as unknown as Tone.Sequence);
+      this.sequences.set(loop.id, part);
     }
   }
 
   startLoop(loopId: string): void {
-    // Unmute the loop so it plays
-    this.loopMuted.set(loopId, false);
     const sequence = this.sequences.get(loopId);
+    const bars = this.loopBars.get(loopId) || 4;
 
     if (sequence) {
-      // Only start if not already started
       if (sequence.state !== 'started') {
-        // Start at transport time 0 - all loops share the same timeline
         sequence.start(0);
+      }
+
+      const transportState = Tone.getTransport().state;
+
+      if (transportState !== 'started') {
+        this.pendingMuteChanges.set(loopId, { muted: false, scheduledId: undefined });
+      } else {
+        const position = Tone.getTransport().position as string;
+        const [currentBars, currentBeats] = position.split(':').map(Number);
+
+        const positionInLoop = currentBars % bars;
+        const beatsIntoLoop = positionInLoop + (currentBeats / 4);
+        const minBufferBeats = bars * 0.25;
+        const beatsUntilNextLoop = bars - beatsIntoLoop;
+
+        let nextLoopStart: number;
+        if (beatsUntilNextLoop < minBufferBeats) {
+          nextLoopStart = Math.ceil((currentBars + 1) / bars) * bars + bars;
+        } else {
+          nextLoopStart = Math.ceil((currentBars + 1) / bars) * bars;
+        }
+
+        const pending = this.pendingMuteChanges.get(loopId);
+        if (pending?.scheduledId !== undefined) {
+          Tone.getTransport().clear(pending.scheduledId);
+        }
+
+        const scheduledId = Tone.getTransport().scheduleOnce((time) => {
+          this.loopMuted.set(loopId, false);
+          this.pendingMuteChanges.delete(loopId);
+          Tone.getDraw().schedule(() => {
+            if (this.onLoopStateChangeCallback) {
+              this.onLoopStateChangeCallback(loopId, true);
+            }
+          }, time);
+        }, `${nextLoopStart}m`);
+
+        this.pendingMuteChanges.set(loopId, { muted: false, scheduledId });
       }
     }
   }
 
   stopLoop(loopId: string): void {
-    // Just mute the loop - don't stop it, so it stays in sync
+    const pending = this.pendingMuteChanges.get(loopId);
+    if (pending?.scheduledId !== undefined) {
+      Tone.getTransport().clear(pending.scheduledId);
+      this.pendingMuteChanges.delete(loopId);
+    }
     this.loopMuted.set(loopId, true);
-    // We keep the sequence running but muted for sync
-    // The Part callback checks loopMuted dynamically
+  }
+
+  scheduleStopLoop(loopId: string): void {
+    const bars = this.loopBars.get(loopId) || 4;
+    const transportState = Tone.getTransport().state;
+
+    if (transportState !== 'started') {
+      this.loopMuted.set(loopId, true);
+      return;
+    }
+
+    const position = Tone.getTransport().position as string;
+    const [currentBars] = position.split(':').map(Number);
+    const nextLoopStart = Math.ceil((currentBars + 1) / bars) * bars;
+
+    const pending = this.pendingMuteChanges.get(loopId);
+    if (pending?.scheduledId !== undefined) {
+      Tone.getTransport().clear(pending.scheduledId);
+    }
+
+    const scheduledId = Tone.getTransport().scheduleOnce((time) => {
+      this.loopMuted.set(loopId, true);
+      this.pendingMuteChanges.delete(loopId);
+      Tone.getDraw().schedule(() => {
+        if (this.onLoopStateChangeCallback) {
+          this.onLoopStateChangeCallback(loopId, false);
+        }
+      }, time);
+    }, `${nextLoopStart}m`);
+
+    this.pendingMuteChanges.set(loopId, { muted: true, scheduledId });
+  }
+
+  isLoopPendingStop(loopId: string): boolean {
+    const pending = this.pendingMuteChanges.get(loopId);
+    return pending !== undefined && pending.muted === true;
+  }
+
+  isLoopPendingStart(loopId: string): boolean {
+    const pending = this.pendingMuteChanges.get(loopId);
+    return pending !== undefined && !pending.muted;
   }
 
   setLoopVolume(loopId: string, volume: number): void {
@@ -495,20 +497,22 @@ export class AudioEngine {
     }
   }
 
-  // Set transpose for a loop (-12 to +12 semitones)
   setLoopTranspose(loopId: string, transpose: number): void {
-    // Clamp to valid range
     const clampedTranspose = Math.max(-12, Math.min(12, transpose));
     this.loopTranspose.set(loopId, clampedTranspose);
-    // No need to recreate sequence - transpose is applied in real-time during playback
   }
 
   setLoopMuted(loopId: string, muted: boolean): void {
-    // Update the muted state in the Map (used by Part callback)
     this.loopMuted.set(loopId, muted);
   }
 
   removeLoop(loopId: string): void {
+    const pending = this.pendingMuteChanges.get(loopId);
+    if (pending?.scheduledId !== undefined) {
+      Tone.getTransport().clear(pending.scheduledId);
+    }
+    this.pendingMuteChanges.delete(loopId);
+
     const sequence = this.sequences.get(loopId);
     if (sequence) {
       sequence.stop();
@@ -522,7 +526,6 @@ export class AudioEngine {
       this.synths.delete(loopId);
     }
 
-    // Clean up drum kit for this loop
     const drumKit = this.drumKits.get(loopId);
     if (drumKit) {
       drumKit.kick.dispose();
@@ -535,86 +538,94 @@ export class AudioEngine {
     this.loopInstruments.delete(loopId);
     this.loopTranspose.delete(loopId);
     this.loopMuted.delete(loopId);
+    this.loopPatterns.delete(loopId);
   }
 
-  // Update a loop's pattern with new notes
+  schedulePatternChange(loopId: string, pattern: NoteEvent[], atBar: number): void {
+    this.pendingPatternChanges.set(loopId, pattern);
+
+    Tone.getTransport().scheduleOnce(() => {
+      const pendingPattern = this.pendingPatternChanges.get(loopId);
+      if (pendingPattern) {
+        this.applyPatternChangeNow(loopId, pendingPattern);
+        this.pendingPatternChanges.delete(loopId);
+      }
+    }, `${atBar}m`);
+  }
+
+  private applyPatternChangeNow(loopId: string, pattern: NoteEvent[]): void {
+    this.updateLoopPattern(loopId, pattern);
+  }
+
   updateLoopPattern(loopId: string, pattern: NoteEvent[]): void {
     const synth = this.synths.get(loopId);
-    const oldSequence = this.sequences.get(loopId);
+    const existingPart = this.sequences.get(loopId);
     const instrument = this.loopInstruments.get(loopId) || 'arpeggio';
     const isDrums = instrument === 'drums';
+    const bars = this.loopBars.get(loopId) || this.getLoopBarsFromPattern(pattern);
 
     if (!synth) return;
 
-    // Stop and dispose old sequence
-    if (oldSequence) {
-      const wasPlaying = oldSequence.state === 'started';
-      oldSequence.stop();
-      oldSequence.dispose();
+    this.loopPatterns.set(loopId, pattern);
 
-      // Create new sequence with the pattern
-      type PartEvent = { time: string; note: NoteEvent };
-      const partEvents: PartEvent[] = pattern.map(n => ({
-        time: this.beatsToToneTime(n.time),
-        note: n
-      }));
+    if (existingPart) {
+      existingPart.clear();
 
-      const part = new Tone.Part<PartEvent>((time, event) => {
-        // Check muted state dynamically
-        const isMuted = this.loopMuted.get(loopId) ?? false;
-        if (isMuted) return;
+      pattern.forEach(n => {
+        const time = this.beatsToToneTime(n.time);
+        existingPart.add(time, { time, note: n });
+      });
 
-        // Get current transpose value (can change during playback)
-        const transpose = this.loopTranspose.get(loopId) || 0;
-        const playNote = isDrums ? event.note.note : transposeNote(event.note.note, transpose);
-
-        if (isDrums) {
-          this.playDrumNote(loopId, playNote, time);
-        } else {
-          synth.triggerAttackRelease(playNote, event.note.duration, time, event.note.velocity || 0.8);
-        }
-      }, partEvents);
-
-      // Configure looping - use stored loop bars, NOT estimated from pattern
-      const bars = this.loopBars.get(loopId) || this.getLoopBarsFromPattern(pattern);
-      part.loop = true;
-      part.loopEnd = `${bars}m`;
-
-      this.sequences.set(loopId, part as unknown as Tone.Sequence);
-
-      // Restart if it was playing
-      if (wasPlaying) {
-        part.start(0);
-      }
+      existingPart.loopEnd = `${bars}m`;
+      return;
     }
+
+    type PartEvent = { time: string; note: NoteEvent };
+    const partEvents: PartEvent[] = pattern.map(n => ({
+      time: this.beatsToToneTime(n.time),
+      note: n
+    }));
+
+    const newPart = new Tone.Part<PartEvent>((time, event) => {
+      const isMuted = this.loopMuted.get(loopId) ?? false;
+      if (isMuted) return;
+
+      const transpose = this.loopTranspose.get(loopId) || 0;
+      const playNote = isDrums ? event.note.note : transposeNote(event.note.note, transpose);
+
+      if (isDrums) {
+        this.playDrumNote(loopId, playNote, time, event.note.velocity || 0.8);
+      } else {
+        synth.triggerAttackRelease(playNote, event.note.duration, time, event.note.velocity || 0.8);
+      }
+    }, partEvents);
+
+    newPart.loop = true;
+    newPart.loopEnd = `${bars}m`;
+
+    this.sequences.set(loopId, newPart);
   }
 
-  // Estimate loop bars from pattern (find max time and round to bars)
   private getLoopBarsFromPattern(pattern: NoteEvent[]): number {
-    if (pattern.length === 0) return 1; // Default 1 bar
+    if (pattern.length === 0) return 1;
     const maxTime = Math.max(...pattern.map(n => n.time));
-    // Round up to next bar (4 beats per bar)
     return Math.ceil((maxTime + 1) / 4);
   }
 
-  // Convert beats to Tone.js time notation (bars:beats:sixteenths)
-  // Raw numbers in Tone.js are interpreted as seconds, so we need string notation
   private beatsToToneTime(beats: number): string {
     const bars = Math.floor(beats / this.beatsPerBar);
     const remainingBeats = beats % this.beatsPerBar;
     const wholeBeat = Math.floor(remainingBeats);
-    const sixteenths = (remainingBeats - wholeBeat) * 4; // 4 sixteenths per beat
+    const sixteenths = (remainingBeats - wholeBeat) * 4;
     return `${bars}:${wholeBeat}:${sixteenths}`;
   }
 
-  // Get current position within a specific loop (for visualization)
   getLoopPhase(loopBars: number): number {
     const position = Tone.getTransport().position as string;
     const [bars] = position.split(':').map(Number);
     return (bars % loopBars) / loopBars;
   }
 
-  // Calculate when all loops will realign (LCM)
   calculateRealignment(loopBars: number[]): number {
     if (loopBars.length === 0) return 0;
 
@@ -624,16 +635,11 @@ export class AudioEngine {
     return loopBars.reduce(lcm);
   }
 
-  // === Preview/Audition Methods (DJ-style pre-listen) ===
-
-  // Preview a pattern before committing - plays once through with preview synth
   previewPattern(pattern: NoteEvent[], bars: number): void {
-    // Stop any existing preview
     this.stopPreview();
 
     if (!this.previewSynth || pattern.length === 0) return;
 
-    // Create a one-shot preview part
     type PartEvent = { time: string; note: NoteEvent };
     const partEvents: PartEvent[] = pattern.map(n => ({
       time: this.beatsToToneTime(n.time),
@@ -645,18 +651,14 @@ export class AudioEngine {
       synth.triggerAttackRelease(event.note.note, event.note.duration, time, event.note.velocity || 0.8);
     }, partEvents);
 
-    // Loop once for preview
     this.previewPart.loop = true;
     this.previewPart.loopEnd = `${bars}m`;
 
-    // Start preview (uses transport time if playing, or immediate if stopped)
     this.previewPart.start(0);
     this.isPreviewPlaying = true;
 
-    // If transport isn't running, temporarily start it for preview
     if (Tone.getTransport().state !== 'started') {
       Tone.getTransport().start();
-      // Auto-stop after one loop cycle
       const loopDurationMs = (bars * this.beatsPerBar * 60 * 1000) / this.getTempo();
       setTimeout(() => {
         if (this.isPreviewPlaying) {
@@ -668,7 +670,6 @@ export class AudioEngine {
     }
   }
 
-  // Stop preview playback
   stopPreview(): void {
     if (this.previewPart) {
       this.previewPart.stop();
@@ -678,12 +679,10 @@ export class AudioEngine {
     this.isPreviewPlaying = false;
   }
 
-  // Check if preview is currently playing
   isPreviewActive(): boolean {
     return this.isPreviewPlaying;
   }
 
-  // Play a single note for auditioning (when clicking on timeline)
   playPreviewNote(note: string, duration: string = '8n'): void {
     if (this.previewSynth) {
       this.previewSynth.triggerAttackRelease(note, duration);
@@ -692,54 +691,55 @@ export class AudioEngine {
 
   dispose(): void {
     this.stopPreview();
-    this.stopImmediate(); // Use immediate stop to avoid fade delay
+    this.stopImmediate();
+
+    this.pendingMuteChanges.forEach((pending) => {
+      if (pending.scheduledId !== undefined) {
+        Tone.getTransport().clear(pending.scheduledId);
+      }
+    });
+    this.pendingMuteChanges.clear();
+
     if (this.previewSynth) {
       this.previewSynth.dispose();
       this.previewSynth = null;
     }
-    // Dispose all per-loop drum kits
+
     this.drumKits.forEach((kit) => {
       kit.kick.dispose();
       kit.snare.dispose();
       kit.hihat.dispose();
     });
     this.drumKits.clear();
+
     if (this.masterGain) {
       this.masterGain.dispose();
     }
+
     this.sequences.forEach((seq) => seq.dispose());
     this.synths.forEach((synth) => synth.dispose());
     this.sequences.clear();
     this.synths.clear();
     this.loopInstruments.clear();
+    this.loopPatterns.clear();
     Tone.getTransport().cancel();
   }
 
-  // === Clock Synchronization Methods ===
-
-  // Handle clock sync from leader
   handleClockSync(clock: ClockSync): void {
     const localTime = performance.now();
     const newOffset = localTime - clock.leaderTime;
-
-    // Smooth the offset to avoid jitter (exponential moving average)
     this.clockOffset = this.clockOffset * 0.8 + newOffset * 0.2;
 
-    // Optionally adjust transport position if drift is significant
     const expectedPosition = clock.transportPosition;
     const currentPosition = this.getCurrentPositionInBars();
     const drift = Math.abs(expectedPosition - currentPosition);
 
-    // If drift exceeds 0.25 bars, resync position
     if (drift > 0.25 && Tone.getTransport().state === 'started') {
-      console.log(`Clock drift: ${drift.toFixed(3)} bars, resyncing...`);
       this.syncToPosition(expectedPosition);
     }
   }
 
-  // Update latency from ping/pong measurement
   setLatency(latencyMs: number): void {
-    // Smooth latency measurements
     this.latency = this.latency * 0.7 + latencyMs * 0.3;
   }
 
@@ -751,7 +751,6 @@ export class AudioEngine {
     return this.clockOffset;
   }
 
-  // Sync transport to a specific bar position
   syncToPosition(bars: number): void {
     const wasPlaying = Tone.getTransport().state === 'started';
     if (wasPlaying) {
@@ -763,14 +762,12 @@ export class AudioEngine {
     }
   }
 
-  // Get current position in bars (including fractional)
   getCurrentPositionInBars(): number {
     const position = Tone.getTransport().position as string;
     const parts = position.split(':').map(Number);
     return parts[0] + parts[1] / this.beatsPerBar + parts[2] / (this.beatsPerBar * 4);
   }
 
-  // Calculate expected position based on shared start time
   getExpectedPosition(sharedStartTime: number): number {
     const elapsed = performance.now() - sharedStartTime + this.clockOffset;
     const beatsPerMs = this.getTempo() / 60 / 1000;
@@ -778,5 +775,4 @@ export class AudioEngine {
   }
 }
 
-// Singleton instance
 export const audioEngine = new AudioEngine();

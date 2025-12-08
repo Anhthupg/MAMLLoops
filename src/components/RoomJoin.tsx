@@ -124,7 +124,16 @@ interface RoomShareProps {
 }
 
 export function RoomShare({ roomId, playerCount, connectionStatus }: RoomShareProps) {
-  const shareUrl = `${window.location.origin}${window.location.pathname}?room=${roomId}`;
+  // Use hash-based URL for better GitHub Pages compatibility
+  // Ensure pathname ends without index.html and with trailing slash
+  let basePath = window.location.pathname;
+  if (basePath.endsWith('index.html')) {
+    basePath = basePath.slice(0, -10);
+  }
+  if (!basePath.endsWith('/')) {
+    basePath = basePath + '/';
+  }
+  const shareUrl = `${window.location.origin}${basePath}#room=${roomId}`;
   const [copied, setCopied] = useState(false);
   const trackInfo = getTracksPerPlayer(playerCount);
 
@@ -161,7 +170,7 @@ export function RoomShare({ roomId, playerCount, connectionStatus }: RoomSharePr
         <div className="qr-container">
           <QRCodeSVG
             value={shareUrl}
-            size={80}
+            size={64}
             bgColor="transparent"
             fgColor="#ffffff"
           />

@@ -20,15 +20,36 @@ function App() {
   const [isInRoom, setIsInRoom] = useState(false);
   const [queuedChanges, setQueuedChanges] = useState<QueuedPatternChange[]>([]);
   const [urlRoomId, setUrlRoomId] = useState<string | null>(null);
+  const [soloedLoopId, setSoloedLoopId] = useState<string | null>(null);
+  const [pendingLoopIds, setPendingLoopIds] = useState<string[]>([]);
+  const [pendingStopLoopIds, setPendingStopLoopIds] = useState<string[]>([]);
   const lastBarRef = useRef(0);
 
   const audio = useAudioEngine();
   const room = useRoom();
 
-  // Check for room ID in URL on mount
+  // Check for room ID in URL on mount (supports both query param and hash)
   useEffect(() => {
+    console.log('[App] Checking URL for room ID...');
+    console.log('[App] window.location.href:', window.location.href);
+    console.log('[App] window.location.hash:', window.location.hash);
+    console.log('[App] window.location.search:', window.location.search);
+
+    // First check query params (?room=XXX)
     const params = new URLSearchParams(window.location.search);
-    const roomParam = params.get('room');
+    let roomParam = params.get('room');
+
+    // Also check hash (#room=XXX) for GitHub Pages compatibility
+    if (!roomParam && window.location.hash) {
+      const hashMatch = window.location.hash.match(/room=([A-Za-z0-9]+)/);
+      console.log('[App] Hash match result:', hashMatch);
+      if (hashMatch) {
+        roomParam = hashMatch[1];
+      }
+    }
+
+    console.log('[App] Final roomParam:', roomParam);
+
     if (roomParam) {
       setUrlRoomId(roomParam.toUpperCase());
     }
@@ -85,6 +106,59 @@ function App() {
     );
   }, [room.roomState]);
 
+  // Subscribe to instant loop state changes from AudioEngine
+  // This is called immediately when a scheduled start/stop executes (perfect sync)
+  useEffect(() => {
+    const unsubscribe = audio.onLoopStateChange((loopId, isPlaying) => {
+      console.log('[App] Instant loop state change:', loopId, isPlaying);
+
+      if (isPlaying) {
+        // Loop just started - remove from pending start list
+        setPendingLoopIds(prev => prev.filter(id => id !== loopId));
+      } else {
+        // Loop just stopped - remove from pending stop list and update room state
+        setPendingStopLoopIds(prev => prev.filter(id => id !== loopId));
+        // Update room state immediately when audio stops
+        room.triggerLoop(loopId, false);
+      }
+    });
+
+    return unsubscribe;
+  }, [audio, room]);
+
+  // Track which loops are pending (queued to start or stop at next cycle)
+  // This only runs on room state changes for initial sync
+  // The instant callback (onLoopStateChange) handles real-time updates
+  useEffect(() => {
+    if (!room.roomState) return;
+
+    // Check all loops from all players for pending state
+    const allPlayerLoops = room.roomState.players.flatMap(p => p.loops);
+
+    const pending = allPlayerLoops
+      .filter(loop => audio.isLoopPendingStart(loop.id))
+      .map(loop => loop.id);
+
+    const pendingStop = allPlayerLoops
+      .filter(loop => audio.isLoopPendingStop(loop.id))
+      .map(loop => loop.id);
+
+    // Only update React state if changed (compare arrays)
+    setPendingLoopIds(prev => {
+      if (prev.length !== pending.length || !prev.every((id, i) => id === pending[i])) {
+        return pending;
+      }
+      return prev;
+    });
+
+    setPendingStopLoopIds(prev => {
+      if (prev.length !== pendingStop.length || !prev.every((id, i) => id === pendingStop[i])) {
+        return pendingStop;
+      }
+      return prev;
+    });
+  }, [room.roomState, audio]);
+
   // Track previous patterns to detect changes from other users
   const prevPatternsRef = useRef<Map<string, string>>(new Map());
 
@@ -139,6 +213,8 @@ function App() {
   }, [room.roomState, audio]);
 
   // Apply queued pattern changes when loop cycles
+  // The audio scheduling is handled by Tone.js (schedulePatternChange)
+  // This useEffect is now only for syncing pattern to other users and UI cleanup
   useEffect(() => {
     if (queuedChanges.length === 0) return;
     if (audio.currentBar === lastBarRef.current) return;
@@ -154,18 +230,16 @@ function App() {
 
     if (changesToApply.length > 0) {
       changesToApply.forEach(change => {
-        // Update local audio engine
-        audio.updateLoopPattern(change.loopId, change.pattern);
-        // Sync pattern to other users
+        // Sync pattern to other users (audio update is already scheduled via Tone.js)
         room.updateLoopPattern(change.loopId, change.pattern);
       });
 
-      // Remove applied changes
+      // Remove applied changes from UI queue
       setQueuedChanges(prev =>
         prev.filter(c => !changesToApply.some(a => a.loopId === c.loopId))
       );
     }
-  }, [audio.currentBar, queuedChanges, room.currentPlayer, audio, room]);
+  }, [audio.currentBar, queuedChanges, room.currentPlayer, room]);
 
   // Handle loop toggle with audio sync
   const handleLoopToggle = (loopId: string, active: boolean) => {
@@ -176,10 +250,21 @@ function App() {
     if (!loop) return;
 
     audio.toggleLoop({ ...loop, muted: !active }, active);
-    room.triggerLoop(loopId, active);
+
+    if (active) {
+      // When starting: immediately show pending state in UI
+      setPendingLoopIds(prev => [...prev.filter(id => id !== loopId), loopId]);
+      // Update room state (visual shows pending-start)
+      room.triggerLoop(loopId, active);
+    } else {
+      // When stopping: immediately show pending-stop state in UI
+      setPendingStopLoopIds(prev => [...prev.filter(id => id !== loopId), loopId]);
+    }
+    // The instant callback (onLoopStateChange) will clear these pending states
+    // and update room state when the audio actually starts/stops
   };
 
-  // Handle pattern change - queue it for next loop cycle
+  // Handle pattern change - schedule it for next loop cycle using Tone.js
   const handlePatternChange = useCallback((loopId: string, pattern: NoteEvent[]) => {
     const player = room.currentPlayer;
     if (!player) return;
@@ -193,10 +278,13 @@ function App() {
     const nextLoopStart = Math.ceil((currentBar + 1) / loopBars) * loopBars;
 
     // Log the pattern for debugging
-    console.log('[App] Queueing pattern change for loop:', loopId, 'at bar:', nextLoopStart);
+    console.log('[App] Scheduling pattern change for loop:', loopId, 'at bar:', nextLoopStart);
     console.log('[App] Pattern notes:', pattern.map(n => ({ note: n.note, time: n.time, duration: n.duration })));
 
-    // Queue the change
+    // Schedule the audio change via Tone.js (precise timing)
+    audio.schedulePatternChange(loopId, pattern, nextLoopStart);
+
+    // Queue the change in React state for UI preview and sync to other users
     setQueuedChanges(prev => {
       // Replace any existing queued change for this loop
       const filtered = prev.filter(c => c.loopId !== loopId);
@@ -206,13 +294,7 @@ function App() {
         applyAtBar: nextLoopStart
       }];
     });
-  }, [room.currentPlayer, audio.currentBar]);
-
-  // Handle variation change - queue the new pattern for next loop cycle
-  const handleVariationChange = useCallback((loopId: string, _variation: number, newPattern: NoteEvent[]) => {
-    // Use the same pattern change mechanism to queue the variation change
-    handlePatternChange(loopId, newPattern);
-  }, [handlePatternChange]);
+  }, [room.currentPlayer, audio.currentBar, audio]);
 
   // Handle volume change - update audio engine and sync to other devices
   const handleVolumeChange = useCallback((loopId: string, volume: number) => {
@@ -229,6 +311,26 @@ function App() {
     // Sync transpose to other users
     room.updateLoopTranspose(loopId, transpose);
   }, [audio, room]);
+
+  // Handle solo change - mute/unmute other tracks
+  const handleSoloChange = useCallback((loopId: string, solo: boolean) => {
+    const newSoloedId = solo ? loopId : null;
+    setSoloedLoopId(newSoloedId);
+
+    // Update volumes: solo mutes all other tracks
+    allLoops.forEach(loop => {
+      if (newSoloedId === null) {
+        // No solo - restore all to normal volume
+        audio.setLoopVolume(loop.id, loop.volume);
+      } else if (loop.id === newSoloedId) {
+        // This is the soloed track - full volume
+        audio.setLoopVolume(loop.id, loop.volume);
+      } else {
+        // Mute non-soloed tracks
+        audio.setLoopVolume(loop.id, 0);
+      }
+    });
+  }, [allLoops, audio]);
 
   // Show join screen if not in room
   if (!isInRoom) {
@@ -247,39 +349,10 @@ function App() {
     <div className="app">
       <header className="app-header">
         <h1>MAML Loops</h1>
-        <RoomShare
-          roomId={roomState.id}
-          playerCount={roomState.players.length}
-          connectionStatus={room.connectionStatus}
-        />
       </header>
 
       <main className="app-main">
-        {/* Compact toolbar row */}
-        <div className="toolbar-row">
-          <TransportControls
-            isPlaying={audio.isPlaying}
-            tempo={audio.tempo}
-            isLeader={isLeader}
-            onPlay={audio.start}
-            onStop={audio.stop}
-            onTempoChange={audio.changeTempo}
-          />
-          <SectionBar
-            sections={roomState.sections}
-            currentSectionIndex={roomState.currentSectionIndex}
-            nextSectionIndex={roomState.nextSectionIndex}
-            sectionVotes={roomState.sectionVotes || []}
-            createSectionVotes={roomState.createSectionVotes || []}
-            playerCount={roomState.players.length}
-            currentBar={audio.currentBar}
-            myPlayerId={currentPlayer.id}
-            onVoteSection={room.voteSection}
-            onVoteCreateSection={room.voteCreateSection}
-          />
-        </div>
-
-        {/* Full-width timeline */}
+        {/* Timeline section */}
         <div className="timeline-section">
           <TimelineView
             loops={allLoops}
@@ -291,34 +364,64 @@ function App() {
             onPreviewPattern={audio.previewPattern}
             onStopPreview={audio.stopPreview}
             onPreviewNote={audio.playPreviewNote}
-            onVariationChange={handleVariationChange}
             onVolumeChange={handleVolumeChange}
             onTransposeChange={handleTransposeChange}
+            onSoloChange={handleSoloChange}
+            soloedLoopId={soloedLoopId}
             editableLoopIds={currentPlayer?.loops.map(l => l.id)}
             queuedChanges={queuedChanges}
           />
         </div>
 
-        {/* Compact loop pads row */}
-        <div className="loop-pads-row">
-          {roomState.players.map((player) => (
-            <LoopPadGrid
-              key={player.id}
-              loops={player.loops}
-              currentBar={audio.currentBar}
-              onToggle={
-                player.id === currentPlayer.id
-                  ? handleLoopToggle
-                  : () => {}
-              }
-              playerName={
-                player.id === currentPlayer.id
-                  ? `${player.name} (You)`
-                  : player.name
-              }
-              playerColor={player.color}
+        {/* Controls + Loop pads row */}
+        <div className="controls-and-pads-row">
+          {/* Transport, Section, and Room controls */}
+          <div className="controls-column">
+            <TransportControls
+              isPlaying={audio.isPlaying}
+              tempo={audio.tempo}
+              isLeader={isLeader}
+              onPlay={audio.start}
+              onStop={audio.stop}
+              onTempoChange={audio.changeTempo}
             />
-          ))}
+            <SectionBar
+              sections={roomState.sections}
+              currentSectionIndex={roomState.currentSectionIndex}
+              nextSectionIndex={roomState.nextSectionIndex}
+              sectionVotes={roomState.sectionVotes || []}
+              createSectionVotes={roomState.createSectionVotes || []}
+              playerCount={roomState.players.length}
+              currentBar={audio.currentBar}
+              myPlayerId={currentPlayer.id}
+              onVoteSection={room.voteSection}
+              onVoteCreateSection={room.voteCreateSection}
+            />
+            <RoomShare
+              roomId={roomState.id}
+              playerCount={roomState.players.length}
+              connectionStatus={room.connectionStatus}
+            />
+          </div>
+
+          {/* Loop pads (the matrix) */}
+          <div className="loop-pads-row">
+            {roomState.players.map((player) => {
+              const isCurrentPlayer = player.id === currentPlayer.id;
+              return (
+                <LoopPadGrid
+                  key={player.id}
+                  loops={player.loops}
+                  currentBar={audio.currentBar}
+                  onToggle={isCurrentPlayer ? handleLoopToggle : () => {}}
+                  playerName={isCurrentPlayer ? `${player.name} (You)` : player.name}
+                  playerColor={player.color}
+                  pendingLoopIds={pendingLoopIds}
+                  pendingStopLoopIds={pendingStopLoopIds}
+                />
+              );
+            })}
+          </div>
         </div>
       </main>
 

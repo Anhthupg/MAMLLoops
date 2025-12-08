@@ -44,6 +44,57 @@
   font-weight: 500;
 }
 
+/* In/Out event signals in header */
+.in-out-events {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.in-out-event {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-size: 9px;
+  font-weight: 600;
+  font-family: monospace;
+  animation: event-pulse 0.6s ease-in-out infinite;
+}
+
+.in-out-event.in {
+  background: rgba(74, 222, 128, 0.2);
+  border: 1px solid rgba(74, 222, 128, 0.5);
+  color: #4ade80;
+}
+
+.in-out-event.out {
+  background: rgba(251, 146, 60, 0.2);
+  border: 1px solid rgba(251, 146, 60, 0.5);
+  color: #fb923c;
+}
+
+.in-out-event .event-icon {
+  font-size: 8px;
+}
+
+.in-out-event .event-type {
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+@keyframes event-pulse {
+  0%, 100% {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+}
+
 .matrix-container {
   display: flex;
   flex-direction: column;
@@ -295,6 +346,164 @@
 
 .loop-pad.active .loop-pad-status {
   color: #fff;
+}
+
+/* Intensity mode button */
+.intensity-mode-btn {
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 1px solid #444;
+  background: rgba(0, 0, 0, 0.3);
+  color: #888;
+  margin-left: auto;
+}
+
+.intensity-mode-btn:hover {
+  border-color: #666;
+  color: #aaa;
+}
+
+.intensity-mode-btn.mode-show {
+  border-color: #60a5fa;
+  color: #60a5fa;
+  background: rgba(96, 165, 250, 0.1);
+}
+
+.intensity-mode-btn.mode-edit {
+  border-color: #f472b6;
+  color: #f472b6;
+  background: rgba(244, 114, 182, 0.1);
+}
+
+/* Loop pad wrapper for selection */
+.loop-pad-wrapper {
+  position: relative;
+}
+
+.loop-pad-wrapper.selected::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border: 2px solid #f472b6;
+  border-radius: 6px;
+  pointer-events: none;
+  animation: pulse-border 1s ease-in-out infinite;
+}
+
+@keyframes pulse-border {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+/* Intensity panel - shows all active loops */
+.intensity-panel {
+  margin: 8px 0;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
+  border: 1px solid #333;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 250px;
+  overflow-y: auto;
+}
+
+.intensity-loop-row {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  cursor: pointer;
+  border-radius: 6px;
+  padding: 4px;
+  transition: background 0.15s;
+}
+
+.intensity-loop-row:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.intensity-loop-row.selected {
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+}
+
+.intensity-loop-label {
+  min-width: 50px;
+  font-size: 10px;
+  font-weight: 700;
+  font-family: monospace;
+  display: flex;
+  align-items: center;
+  padding-left: 4px;
+}
+
+.intensity-empty {
+  color: #555;
+  font-size: 11px;
+  font-style: italic;
+  text-align: center;
+  padding: 12px;
+}
+
+/* Loop pad with intensity bars */
+.loop-pad.has-intensity {
+  overflow: hidden;
+}
+
+/* Pending state - loop is queued to start at next cycle */
+.loop-pad.pending {
+  animation: pending-pulse 0.8s ease-in-out infinite;
+  border: 1px solid var(--loop-color) !important;
+  opacity: 0.85;
+}
+
+.loop-pad.pending .loop-pad-progress {
+  display: none;
+}
+
+@keyframes pending-pulse {
+  0%, 100% {
+    box-shadow: 0 0 4px var(--loop-color), inset 0 0 4px rgba(255, 255, 255, 0.05);
+    background: linear-gradient(135deg, rgba(255,255,255,0.03), transparent);
+  }
+  50% {
+    box-shadow: 0 0 12px var(--loop-color), inset 0 0 8px rgba(255, 255, 255, 0.15);
+    background: linear-gradient(135deg, rgba(255,255,255,0.12), transparent);
+  }
+}
+
+.pending-indicator {
+  font-size: 8px;
+  color: var(--loop-color);
+  animation: pending-dots 1s ease-in-out infinite;
+  margin-left: 2px;
+}
+
+@keyframes pending-dots {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+
+/* Pending stop state - track is scheduled to end at next cycle */
+.loop-pad.pending-stop {
+  animation: pending-stop-pulse 0.8s ease-in-out infinite;
+  border: 1px solid rgba(255, 100, 100, 0.6) !important;
+}
+
+@keyframes pending-stop-pulse {
+  0%, 100% {
+    box-shadow: 0 0 4px var(--loop-color), inset 0 0 4px rgba(255, 100, 100, 0.1);
+    opacity: 1;
+  }
+  50% {
+    box-shadow: 0 0 8px rgba(255, 100, 100, 0.5), inset 0 0 6px rgba(255, 100, 100, 0.2);
+    opacity: 0.7;
+  }
 }
 
 /* Responsive */

@@ -3,42 +3,46 @@
   border-radius: 8px;
   padding: 6px 10px;
   display: flex;
+  flex-direction: row;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
 .section-header {
   display: flex;
+  flex-direction: row;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
+  flex-shrink: 0;
 }
 
 .current-section {
   display: flex;
-  align-items: baseline;
-  gap: 4px;
+  align-items: center;
+  gap: 3px;
 }
 
 .section-label {
-  font-size: 9px;
-  color: #666;
+  font-size: 10px;
+  color: #555;
   text-transform: uppercase;
 }
 
 .section-name {
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 700;
-  color: #fff;
+  color: #4ade80;
   font-family: monospace;
 }
 
 .next-section {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 4px;
   padding: 4px 8px;
   background: #252542;
-  border-radius: 6px;
+  border-radius: 4px;
   animation: pulse 1s ease-in-out infinite;
 }
 
@@ -48,7 +52,7 @@
 }
 
 .next-label {
-  font-size: 9px;
+  font-size: 10px;
   color: #888;
 }
 
@@ -65,14 +69,13 @@
 }
 
 .section-progress {
-  flex: 1;
-  min-width: 100px;
-  max-width: 200px;
+  width: 60px;
   height: 16px;
   background: #252542;
   border-radius: 8px;
   position: relative;
   overflow: hidden;
+  flex-shrink: 0;
 }
 
 .progress-fill {
@@ -89,7 +92,7 @@
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   color: #fff;
   font-family: monospace;
@@ -98,21 +101,23 @@
 
 .section-buttons {
   display: flex;
+  flex-wrap: wrap;
   gap: 4px;
+  justify-content: center;
 }
 
 .section-button {
-  padding: 6px 12px;
+  padding: 6px 10px;
   border: 1px solid #333;
-  border-radius: 6px;
+  border-radius: 4px;
   background: #252542;
   color: #888;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.15s;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  gap: 0;
+  gap: 4px;
 }
 
 .section-button:not(:disabled):hover {
@@ -145,31 +150,30 @@
 }
 
 .button-name {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
   line-height: 1;
 }
 
 .vote-count {
-  font-size: 9px;
+  font-size: 10px;
   color: #f59e0b;
   font-weight: 600;
 }
 
 .queued-indicator {
-  font-size: 10px;
+  font-size: 11px;
   color: #f472b6;
   font-weight: 700;
 }
 
 .memory-indicator {
-  font-size: 8px;
+  font-size: 9px;
   color: #a855f7;
   font-weight: 700;
   background: rgba(168, 85, 247, 0.2);
-  padding: 1px 3px;
+  padding: 2px 4px;
   border-radius: 3px;
-  margin-left: 2px;
 }
 
 .section-button.has-memory {
@@ -190,24 +194,27 @@
 /* Create section buttons */
 .create-section-buttons {
   display: flex;
+  flex-wrap: nowrap;
   gap: 4px;
-  margin-left: 8px;
+  margin-left: 0;
   padding-left: 8px;
   border-left: 1px solid #333;
+  padding-top: 0;
+  border-top: none;
 }
 
 .create-section-btn {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  gap: 2px;
-  padding: 4px 8px;
+  gap: 3px;
+  padding: 5px 8px;
   border: 1px dashed #444;
-  border-radius: 6px;
+  border-radius: 4px;
   background: #1a1a2e;
   color: #666;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.15s;
 }
 
 .create-section-btn:hover {
@@ -246,22 +253,59 @@
 }
 
 .btn-label {
-  font-size: 8px;
+  font-size: 9px;
   text-transform: uppercase;
 }
 
-/* Responsive */
-@media (max-width: 600px) {
+/* Hide vote notice in compact mode */
+.vote-notice {
+  display: none;
+}
+
+/* Responsive - stack vertically on larger screens */
+@media (min-width: 769px) {
   .section-bar {
-    flex-wrap: wrap;
+    flex-direction: column;
     gap: 6px;
   }
 
+  .section-header {
+    flex-direction: column;
+  }
+
   .section-progress {
-    min-width: 80px;
+    width: 100%;
+  }
+
+  .create-section-buttons {
+    flex-wrap: wrap;
+    padding-left: 0;
+    border-left: none;
+    padding-top: 6px;
+    border-top: 1px solid #333;
+  }
+}
+
+/* Compact for phones */
+@media (max-width: 600px) {
+  .section-bar {
+    gap: 6px;
+    padding: 4px 8px;
+  }
+
+  .section-progress {
+    width: 50px;
   }
 
   .section-name {
     font-size: 16px;
+  }
+
+  .section-button {
+    padding: 4px 6px;
+  }
+
+  .button-name {
+    font-size: 11px;
   }
 }

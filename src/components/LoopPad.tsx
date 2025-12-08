@@ -11,12 +11,15 @@ interface LoopPadProps {
   onToggle: (loopId: string, active: boolean) => void;
   onEdit?: (loopId: string) => void;
   compact?: boolean;
+  isPending?: boolean; // True if loop is queued to start at next cycle
+  isPendingStop?: boolean; // True if loop is scheduled to stop at next cycle
 }
 
-export function LoopPad({ loop, currentBar, onToggle, onEdit, compact = false }: LoopPadProps) {
+export function LoopPad({ loop, currentBar, onToggle, onEdit, compact = false, isPending = false, isPendingStop = false }: LoopPadProps) {
   const isActive = !loop.muted;
   const phase = (currentBar % loop.bars) / loop.bars;
   const currentLoopBar = (currentBar % loop.bars) + 1;
+  const barsRemaining = loop.bars - (currentBar % loop.bars);
 
   // Get instrument info
   const instrumentInfo = INSTRUMENT_INFO[loop.instrument] || INSTRUMENT_INFO.arpeggio;
@@ -38,31 +41,55 @@ export function LoopPad({ loop, currentBar, onToggle, onEdit, compact = false }:
     }
   };
 
+  // Determine title based on state
+  let title = `${instrumentInfo.label} ${loop.bars} bar${loop.bars > 1 ? 's' : ''}`;
+  if (isPending) {
+    title = `${instrumentInfo.label} - Queued (starting next cycle)`;
+  } else if (isPendingStop) {
+    title = `${instrumentInfo.label} - Ending in ${barsRemaining} bar${barsRemaining > 1 ? 's' : ''}`;
+  }
+
+  // Determine status text
+  let statusText = isActive ? `${currentLoopBar}/${loop.bars}` : `${loop.bars}b`;
+  if (isPending) {
+    statusText = 'Queued';
+  } else if (isPendingStop) {
+    statusText = `Out ${barsRemaining}`;
+  }
+
   return (
     <button
-      className={`loop-pad ${isActive ? 'active' : ''} ${compact ? 'compact' : ''}`}
+      className={`loop-pad ${isActive ? 'active' : ''} ${compact ? 'compact' : ''} ${isPending ? 'pending' : ''} ${isPendingStop ? 'pending-stop' : ''}`}
       style={{
         '--loop-color': loop.color,
         '--phase': phase,
       } as React.CSSProperties}
       onClick={handleClick}
       onContextMenu={handleContextMenu}
-      title={`${instrumentInfo.label} ${loop.bars} bar${loop.bars > 1 ? 's' : ''}`}
+      title={title}
     >
       <div className="loop-pad-progress" />
       {compact ? (
-        <span className="loop-pad-label">{loop.name}</span>
+        <>
+          <span className="loop-pad-label">{loop.name}</span>
+          {isPending && <span className="pending-indicator">...</span>}
+          {isPendingStop && <span className="pending-indicator">⏹</span>}
+        </>
       ) : (
         <>
           <span className="loop-pad-icon">{instrumentInfo.icon}</span>
           <span className="loop-pad-label">{loop.name}</span>
-          <span className="loop-pad-status">
-            {isActive ? `${currentLoopBar}/${loop.bars}` : `${loop.bars}b`}
-          </span>
+          <span className="loop-pad-status">{statusText}</span>
         </>
       )}
     </button>
   );
+}
+
+interface InOutEvent {
+  loopName: string;
+  type: 'in' | 'out';
+  instrument: string;
 }
 
 interface LoopPadGridProps {
@@ -72,6 +99,8 @@ interface LoopPadGridProps {
   onEdit?: (loopId: string) => void;
   playerName: string;
   playerColor: string;
+  pendingLoopIds?: string[]; // IDs of loops that are queued to start
+  pendingStopLoopIds?: string[]; // IDs of loops that are queued to stop
 }
 
 export function LoopPadGrid({
@@ -81,6 +110,8 @@ export function LoopPadGrid({
   onEdit,
   playerName,
   playerColor,
+  pendingLoopIds = [],
+  pendingStopLoopIds = [],
 }: LoopPadGridProps) {
   // Group loops by instrument type
   const loopsByInstrument = INSTRUMENT_ORDER.map(instrument => ({
@@ -94,6 +125,35 @@ export function LoopPadGrid({
   // Count active loops
   const activeCount = loops.filter(l => !l.muted).length;
 
+  // Build in/out event list
+  const inOutEvents: InOutEvent[] = [];
+
+  // "In" events - loops pending to start
+  pendingLoopIds.forEach(loopId => {
+    const loop = loops.find(l => l.id === loopId);
+    if (loop) {
+      const info = INSTRUMENT_INFO[loop.instrument] || INSTRUMENT_INFO.arpeggio;
+      inOutEvents.push({
+        loopName: loop.name,
+        type: 'in',
+        instrument: info.icon
+      });
+    }
+  });
+
+  // "Out" events - loops pending to stop
+  pendingStopLoopIds.forEach(loopId => {
+    const loop = loops.find(l => l.id === loopId);
+    if (loop) {
+      const info = INSTRUMENT_INFO[loop.instrument] || INSTRUMENT_INFO.arpeggio;
+      inOutEvents.push({
+        loopName: loop.name,
+        type: 'out',
+        instrument: info.icon
+      });
+    }
+  });
+
   return (
     <div className="loop-pad-matrix">
       <div className="player-header" style={{ borderColor: playerColor }}>
@@ -105,18 +165,25 @@ export function LoopPadGrid({
         {activeCount > 0 && (
           <span className="active-count">{activeCount} active</span>
         )}
+        {/* In/Out event signals */}
+        {inOutEvents.length > 0 && (
+          <div className="in-out-events">
+            {inOutEvents.map((event, idx) => (
+              <span
+                key={`${event.type}-${event.loopName}-${idx}`}
+                className={`in-out-event ${event.type}`}
+                title={`${event.loopName} ${event.type === 'in' ? 'coming in' : 'going out'}`}
+              >
+                <span className="event-icon">{event.instrument}</span>
+                <span className="event-type">{event.type}</span>
+              </span>
+            ))}
+          </div>
+        )}
       </div>
+
       <div className="matrix-container">
-        {/* Bar length header with descriptive labels */}
-        <div className="matrix-header">
-          <div className="matrix-label"></div>
-          {[1, 2, 3, 4, 5, 6, 7, 8].map(bars => (
-            <div key={bars} className="matrix-bar-label" title={`${bars} bar${bars > 1 ? 's' : ''} loop`}>
-              <span className="bar-number">{bars}</span>
-            </div>
-          ))}
-        </div>
-        {/* Header subtitle */}
+        {/* Header hint */}
         <div className="matrix-header-subtitle">
           <div className="matrix-label"></div>
           <div className="bars-hint">← short loops | long loops →</div>
@@ -136,14 +203,17 @@ export function LoopPadGrid({
                   const loop = instrumentLoops.find(l => l.bars === bars);
                   if (!loop) return <div key={bars} className="matrix-cell-empty" title={`No ${info.label} ${bars}-bar loop`} />;
                   return (
-                    <LoopPad
-                      key={loop.id}
-                      loop={loop}
-                      currentBar={currentBar}
-                      onToggle={onToggle}
-                      onEdit={onEdit}
-                      compact
-                    />
+                    <div key={loop.id} className="loop-pad-wrapper">
+                      <LoopPad
+                        loop={loop}
+                        currentBar={currentBar}
+                        onToggle={onToggle}
+                        onEdit={onEdit}
+                        compact
+                        isPending={pendingLoopIds.includes(loop.id)}
+                        isPendingStop={pendingStopLoopIds.includes(loop.id)}
+                      />
+                    </div>
                   );
                 })}
               </div>
@@ -152,7 +222,9 @@ export function LoopPadGrid({
         })}
       </div>
       <div className="matrix-footer">
-        <span className="matrix-hint">Click to toggle • Shift+click to edit</span>
+        <span className="matrix-hint">
+          Click to toggle • Shift+click to edit
+        </span>
       </div>
     </div>
   );

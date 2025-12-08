@@ -61,6 +61,9 @@ export interface LoopSnapshot {
   playerId: string;
   pattern: NoteEvent[];
   muted: boolean;
+  volume?: number;
+  transpose?: number;
+  variation?: number;
 }
 
 export interface Section {

@@ -3,6 +3,9 @@ import * as Tone from 'tone';
 import { audioEngine } from '../audio/AudioEngine';
 import type { Loop, NoteEvent } from '../types';
 
+// Type for loop state change listener
+type LoopStateChangeListener = (loopId: string, isPlaying: boolean) => void;
+
 export function useAudioEngine() {
   const [isReady, setIsReady] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -11,10 +14,21 @@ export function useAudioEngine() {
   const [tempo, setTempo] = useState(120);
   const activeLoopsRef = useRef<Set<string>>(new Set());
 
+  // Listeners for loop state changes (instant callback from AudioEngine)
+  const loopStateListenersRef = useRef<Set<LoopStateChangeListener>>(new Set());
+
   useEffect(() => {
     audioEngine.onBeat((beat, bar) => {
       setCurrentBeat(beat);
       setCurrentBar(bar);
+    });
+
+    // Register for instant loop state change notifications
+    audioEngine.onLoopStateChange((loopId, isPlaying) => {
+      // Notify all registered listeners immediately
+      loopStateListenersRef.current.forEach(listener => {
+        listener(loopId, isPlaying);
+      });
     });
 
     return () => {
@@ -49,6 +63,11 @@ export function useAudioEngine() {
     if (!isReady) {
       await initAudio();
     }
+    // Ensure all active loops have their sequences started
+    activeLoopsRef.current.forEach(loopId => {
+      audioEngine.startLoop(loopId);
+    });
+    console.log('[useAudioEngine] Starting transport, active loops:', activeLoopsRef.current.size);
     audioEngine.play();
     setIsPlaying(true);
   }, [isReady, initAudio]);
@@ -75,14 +94,17 @@ export function useAudioEngine() {
   }, []);
 
   const toggleLoop = useCallback((loop: Loop, active: boolean) => {
+    console.log('[useAudioEngine] toggleLoop:', loop.id, active, 'pattern length:', loop.pattern.length);
     if (active) {
       // createLoop will skip if already exists
       audioEngine.createLoop(loop);
       audioEngine.startLoop(loop.id);
       activeLoopsRef.current.add(loop.id);
+      console.log('[useAudioEngine] Active loops now:', activeLoopsRef.current.size);
     } else {
-      // stopLoop just mutes - keeps sequence running for sync
-      audioEngine.stopLoop(loop.id);
+      // Use quantized stop during playback - schedule mute at end of loop cycle
+      audioEngine.scheduleStopLoop(loop.id);
+      activeLoopsRef.current.delete(loop.id);
     }
   }, []);
 
@@ -101,6 +123,11 @@ export function useAudioEngine() {
 
   const updateLoopPattern = useCallback((loopId: string, pattern: NoteEvent[]) => {
     audioEngine.updateLoopPattern(loopId, pattern);
+  }, []);
+
+  // Schedule a pattern change at a specific bar (uses Tone.js scheduling for precise timing)
+  const schedulePatternChange = useCallback((loopId: string, pattern: NoteEvent[], atBar: number) => {
+    audioEngine.schedulePatternChange(loopId, pattern, atBar);
   }, []);
 
   const setLoopVolume = useCallback((loopId: string, volume: number) => {
@@ -127,6 +154,30 @@ export function useAudioEngine() {
     audioEngine.playPreviewNote(note);
   }, []);
 
+  // Check if a loop is pending start (queued but not yet playing)
+  const isLoopPendingStart = useCallback((loopId: string) => {
+    return audioEngine.isLoopPendingStart(loopId);
+  }, []);
+
+  // Schedule a loop to stop at the end of its current cycle
+  const scheduleStopLoop = useCallback((loopId: string) => {
+    audioEngine.scheduleStopLoop(loopId);
+  }, []);
+
+  // Check if a loop is pending stop (will stop at end of cycle)
+  const isLoopPendingStop = useCallback((loopId: string) => {
+    return audioEngine.isLoopPendingStop(loopId);
+  }, []);
+
+  // Subscribe to loop state changes (instant callback when loop starts/stops)
+  const onLoopStateChange = useCallback((listener: (loopId: string, isPlaying: boolean) => void) => {
+    loopStateListenersRef.current.add(listener);
+    // Return unsubscribe function
+    return () => {
+      loopStateListenersRef.current.delete(listener);
+    };
+  }, []);
+
   return {
     isReady,
     isPlaying,
@@ -144,10 +195,15 @@ export function useAudioEngine() {
     getLoopPhase,
     calculateRealignment,
     updateLoopPattern,
+    schedulePatternChange, // Uses Tone.js scheduling for precise timing
     setLoopVolume,
     setLoopTranspose,
     previewPattern,
     stopPreview,
     playPreviewNote,
+    isLoopPendingStart,
+    scheduleStopLoop,
+    isLoopPendingStop,
+    onLoopStateChange, // Subscribe to instant loop state changes
   };
 }

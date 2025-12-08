@@ -25,8 +25,8 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 24px;
-  background: rgba(26, 26, 46, 0.8);
+  padding: 8px 16px;
+  background: rgba(26, 26, 46, 0.9);
   backdrop-filter: blur(10px);
   border-bottom: 1px solid #252542;
   position: sticky;
@@ -36,7 +36,7 @@ body {
 
 .app-header h1 {
   margin: 0;
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 700;
   background: linear-gradient(135deg, #f472b6, #60a5fa);
   -webkit-background-clip: text;
@@ -48,11 +48,11 @@ body {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 8px 16px;
+  gap: 6px;
+  padding: 6px 12px;
 }
 
-/* Compact toolbar row */
+/* Legacy toolbar row (deprecated) */
 .toolbar-row {
   display: flex;
   align-items: center;
@@ -60,7 +60,7 @@ body {
   flex-wrap: wrap;
 }
 
-/* Timeline takes remaining space */
+/* Timeline takes maximum space - prioritize pattern visualization */
 .timeline-section {
   width: 100%;
   background: #0a0a0f;
@@ -68,7 +68,42 @@ body {
   border: 1px solid #252542;
   overflow: hidden;
   flex: 1;
-  min-height: 200px;
+  min-height: 300px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Controls + Loop pads row - horizontal layout */
+.controls-and-pads-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+/* Controls row - horizontal layout on all screen sizes */
+.controls-column {
+  display: flex;
+  flex-direction: row;
+  gap: 4px;
+  flex-shrink: 0;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  overflow-x: auto;
+}
+
+/* On larger screens, keep horizontal but allow more space */
+@media (min-width: 769px) {
+  .controls-and-pads-row {
+    flex-direction: row;
+    align-items: flex-start;
+  }
+
+  .controls-column {
+    flex-direction: column;
+    flex-wrap: nowrap;
+    overflow-x: visible;
+  }
 }
 
 /* Compact loop pads row */
@@ -77,6 +112,7 @@ body {
   gap: 8px;
   overflow-x: auto;
   padding-bottom: 4px;
+  flex: 1;
 }
 
 .loop-pads-row::-webkit-scrollbar {
