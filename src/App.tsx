@@ -19,17 +19,18 @@ interface QueuedPatternChange {
 function App() {
   const [isInRoom, setIsInRoom] = useState(false);
   const [queuedChanges, setQueuedChanges] = useState<QueuedPatternChange[]>([]);
+  const [urlRoomId, setUrlRoomId] = useState<string | null>(null);
   const lastBarRef = useRef(0);
 
   const audio = useAudioEngine();
   const room = useRoom();
 
-  // Check for room ID in URL
+  // Check for room ID in URL on mount
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const roomParam = params.get('room');
     if (roomParam) {
-      // Auto-prompt to join if room ID in URL
+      setUrlRoomId(roomParam.toUpperCase());
     }
   }, []);
 
@@ -227,7 +228,7 @@ function App() {
 
   // Show join screen if not in room
   if (!isInRoom) {
-    return <RoomJoin onJoin={handleJoin} />;
+    return <RoomJoin onJoin={handleJoin} initialRoomId={urlRoomId} />;
   }
 
   const { roomState, currentPlayer } = room;

@@ -14,13 +14,15 @@ const PLAYER_COLORS = [
 
 interface RoomJoinProps {
   onJoin: (name: string, color: string, roomId?: string) => void;
+  initialRoomId?: string | null;
 }
 
-export function RoomJoin({ onJoin }: RoomJoinProps) {
+export function RoomJoin({ onJoin, initialRoomId }: RoomJoinProps) {
   const [name, setName] = useState('');
   const [selectedColor, setSelectedColor] = useState(PLAYER_COLORS[0]);
-  const [roomId, setRoomId] = useState('');
-  const [mode, setMode] = useState<'create' | 'join'>('create');
+  const [roomId, setRoomId] = useState(initialRoomId || '');
+  // Auto-switch to join mode if room ID is provided via URL
+  const [mode, setMode] = useState<'create' | 'join'>(initialRoomId ? 'join' : 'create');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -81,7 +83,10 @@ export function RoomJoin({ onJoin }: RoomJoinProps) {
 
         {mode === 'join' && (
           <div className="form-group">
-            <label>Room Code</label>
+            <label>
+              Room Code
+              {initialRoomId && <span className="from-qr"> (from link)</span>}
+            </label>
             <input
               type="text"
               value={roomId}
@@ -89,6 +94,8 @@ export function RoomJoin({ onJoin }: RoomJoinProps) {
               placeholder="Enter room code"
               maxLength={8}
               required
+              readOnly={!!initialRoomId}
+              className={initialRoomId ? 'prefilled' : ''}
             />
           </div>
         )}
