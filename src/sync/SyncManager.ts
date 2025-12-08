@@ -218,17 +218,17 @@ class PeerSync {
 // INCREDIBOX-STYLE INSTRUMENT PATTERNS
 // =====================================
 // Pattern generators for each instrument type
-// Each generator creates patterns for any bar length with 5 variations (A-E)
+// Each generator creates patterns for any bar length with 10 variations (1-10)
 
 // Helper to generate drum patterns for any bar length
 // Time values are in BEATS (4 beats per bar in 4/4 time)
-// variation: 0-4 (A-E) for different drum styles
+// variation: 0-9 for different drum styles
 function generateDrumPattern(bars: number, variation: number = 0): NoteEvent[] {
   const pattern: NoteEvent[] = [];
   for (let bar = 0; bar < bars; bar++) {
     const offset = bar * 4;
-    switch (variation) {
-      case 0: // A - Standard rock beat
+    switch (variation % 10) {
+      case 0: // Standard rock beat
         pattern.push(
           { note: 'C1', time: offset + 0, duration: '8n' },
           { note: 'E1', time: offset + 0, duration: '16n' },
@@ -244,7 +244,7 @@ function generateDrumPattern(bars: number, variation: number = 0): NoteEvent[] {
           { note: 'E1', time: offset + 3.5, duration: '16n' },
         );
         break;
-      case 1: // B - Syncopated kick
+      case 1: // Syncopated kick
         pattern.push(
           { note: 'C1', time: offset + 0, duration: '8n' },
           { note: 'E1', time: offset + 0.5, duration: '16n' },
@@ -256,7 +256,7 @@ function generateDrumPattern(bars: number, variation: number = 0): NoteEvent[] {
           { note: 'C1', time: offset + 3.5, duration: '8n' },
         );
         break;
-      case 2: // C - Four on the floor
+      case 2: // Four on the floor
         pattern.push(
           { note: 'C1', time: offset + 0, duration: '8n' },
           { note: 'E1', time: offset + 0.5, duration: '16n' },
@@ -270,7 +270,7 @@ function generateDrumPattern(bars: number, variation: number = 0): NoteEvent[] {
           { note: 'E1', time: offset + 3.5, duration: '16n' },
         );
         break;
-      case 3: // D - Breakbeat
+      case 3: // Breakbeat
         pattern.push(
           { note: 'C1', time: offset + 0, duration: '8n' },
           { note: 'E1', time: offset + 0.5, duration: '16n' },
@@ -281,10 +281,77 @@ function generateDrumPattern(bars: number, variation: number = 0): NoteEvent[] {
           { note: 'C1', time: offset + 3.5, duration: '8n' },
         );
         break;
-      case 4: // E - Sparse/minimal
+      case 4: // Sparse/minimal
         pattern.push(
           { note: 'C1', time: offset + 0, duration: '8n' },
           { note: 'D1', time: offset + 2, duration: '8n' },
+        );
+        break;
+      case 5: // Hihat-heavy 16ths
+        pattern.push(
+          { note: 'C1', time: offset + 0, duration: '8n' },
+          { note: 'E1', time: offset + 0.25, duration: '16n' },
+          { note: 'E1', time: offset + 0.5, duration: '16n' },
+          { note: 'E1', time: offset + 0.75, duration: '16n' },
+          { note: 'D1', time: offset + 1, duration: '8n' },
+          { note: 'E1', time: offset + 1.25, duration: '16n' },
+          { note: 'E1', time: offset + 1.5, duration: '16n' },
+          { note: 'E1', time: offset + 1.75, duration: '16n' },
+          { note: 'C1', time: offset + 2, duration: '8n' },
+          { note: 'E1', time: offset + 2.5, duration: '16n' },
+          { note: 'D1', time: offset + 3, duration: '8n' },
+          { note: 'E1', time: offset + 3.5, duration: '16n' },
+        );
+        break;
+      case 6: // Double kick
+        pattern.push(
+          { note: 'C1', time: offset + 0, duration: '8n' },
+          { note: 'C1', time: offset + 0.5, duration: '8n' },
+          { note: 'D1', time: offset + 1, duration: '8n' },
+          { note: 'E1', time: offset + 1.5, duration: '16n' },
+          { note: 'C1', time: offset + 2, duration: '8n' },
+          { note: 'C1', time: offset + 2.5, duration: '8n' },
+          { note: 'D1', time: offset + 3, duration: '8n' },
+          { note: 'E1', time: offset + 3.5, duration: '16n' },
+        );
+        break;
+      case 7: // Shuffle feel
+        pattern.push(
+          { note: 'C1', time: offset + 0, duration: '8n' },
+          { note: 'E1', time: offset + 0.67, duration: '16n' },
+          { note: 'D1', time: offset + 1, duration: '8n' },
+          { note: 'E1', time: offset + 1.67, duration: '16n' },
+          { note: 'C1', time: offset + 2, duration: '8n' },
+          { note: 'E1', time: offset + 2.67, duration: '16n' },
+          { note: 'D1', time: offset + 3, duration: '8n' },
+          { note: 'C1', time: offset + 3.5, duration: '8n' },
+        );
+        break;
+      case 8: // Trap-style
+        pattern.push(
+          { note: 'C1', time: offset + 0, duration: '8n' },
+          { note: 'E1', time: offset + 0.25, duration: '16n' },
+          { note: 'E1', time: offset + 0.5, duration: '16n' },
+          { note: 'E1', time: offset + 0.75, duration: '16n' },
+          { note: 'E1', time: offset + 1, duration: '16n' },
+          { note: 'D1', time: offset + 1.5, duration: '8n' },
+          { note: 'E1', time: offset + 2, duration: '16n' },
+          { note: 'E1', time: offset + 2.25, duration: '16n' },
+          { note: 'C1', time: offset + 2.5, duration: '8n' },
+          { note: 'E1', time: offset + 3, duration: '16n' },
+          { note: 'D1', time: offset + 3.5, duration: '8n' },
+        );
+        break;
+      case 9: // Half-time
+        pattern.push(
+          { note: 'C1', time: offset + 0, duration: '8n' },
+          { note: 'E1', time: offset + 0.5, duration: '16n' },
+          { note: 'E1', time: offset + 1, duration: '16n' },
+          { note: 'E1', time: offset + 1.5, duration: '16n' },
+          { note: 'D1', time: offset + 2, duration: '8n' },
+          { note: 'E1', time: offset + 2.5, duration: '16n' },
+          { note: 'E1', time: offset + 3, duration: '16n' },
+          { note: 'E1', time: offset + 3.5, duration: '16n' },
         );
         break;
     }
@@ -293,15 +360,15 @@ function generateDrumPattern(bars: number, variation: number = 0): NoteEvent[] {
 }
 
 // Helper to generate bass patterns for any bar length
-// variation: 0-4 (A-E) for different bass styles
+// variation: 0-9 for different bass styles
 function generateBassPattern(bars: number, variation: number = 0): NoteEvent[] {
   const roots = ['C2', 'F2', 'G2', 'Ab2', 'Bb2', 'Eb2', 'F2', 'C2'];
   const pattern: NoteEvent[] = [];
   for (let bar = 0; bar < bars; bar++) {
     const offset = bar * 4;
     const root = roots[bar % roots.length];
-    switch (variation) {
-      case 0: // A - Driving eighths
+    switch (variation % 10) {
+      case 0: // Driving eighths
         pattern.push(
           { note: root, time: offset + 0, duration: '4n' },
           { note: root, time: offset + 1.5, duration: '8n' },
@@ -309,7 +376,7 @@ function generateBassPattern(bars: number, variation: number = 0): NoteEvent[] {
           { note: root, time: offset + 3.5, duration: '8n' },
         );
         break;
-      case 1: // B - Walking bass
+      case 1: // Walking bass
         pattern.push(
           { note: root, time: offset + 0, duration: '4n' },
           { note: 'Eb2', time: offset + 1, duration: '4n' },
@@ -317,7 +384,7 @@ function generateBassPattern(bars: number, variation: number = 0): NoteEvent[] {
           { note: 'G2', time: offset + 3, duration: '4n' },
         );
         break;
-      case 2: // C - Octave jumps
+      case 2: // Octave jumps
         pattern.push(
           { note: root, time: offset + 0, duration: '8n' },
           { note: 'C3', time: offset + 0.5, duration: '8n' },
@@ -325,7 +392,7 @@ function generateBassPattern(bars: number, variation: number = 0): NoteEvent[] {
           { note: 'C3', time: offset + 2.5, duration: '8n' },
         );
         break;
-      case 3: // D - Syncopated
+      case 3: // Syncopated
         pattern.push(
           { note: root, time: offset + 0, duration: '8n' },
           { note: root, time: offset + 1.5, duration: '8n' },
@@ -333,9 +400,57 @@ function generateBassPattern(bars: number, variation: number = 0): NoteEvent[] {
           { note: root, time: offset + 3, duration: '4n' },
         );
         break;
-      case 4: // E - Long sustained
+      case 4: // Long sustained
         pattern.push(
           { note: root, time: offset + 0, duration: '1n' },
+        );
+        break;
+      case 5: // Pumping 8ths
+        pattern.push(
+          { note: root, time: offset + 0, duration: '8n' },
+          { note: root, time: offset + 0.5, duration: '8n' },
+          { note: root, time: offset + 1, duration: '8n' },
+          { note: root, time: offset + 1.5, duration: '8n' },
+          { note: root, time: offset + 2, duration: '8n' },
+          { note: root, time: offset + 2.5, duration: '8n' },
+          { note: root, time: offset + 3, duration: '8n' },
+          { note: root, time: offset + 3.5, duration: '8n' },
+        );
+        break;
+      case 6: // Funk slap
+        pattern.push(
+          { note: root, time: offset + 0, duration: '16n' },
+          { note: 'G2', time: offset + 0.75, duration: '16n' },
+          { note: root, time: offset + 1, duration: '8n' },
+          { note: root, time: offset + 2, duration: '16n' },
+          { note: 'G2', time: offset + 2.5, duration: '16n' },
+          { note: root, time: offset + 3, duration: '8n' },
+        );
+        break;
+      case 7: // Reggae offbeat
+        pattern.push(
+          { note: root, time: offset + 0.5, duration: '8n' },
+          { note: root, time: offset + 1.5, duration: '8n' },
+          { note: root, time: offset + 2.5, duration: '8n' },
+          { note: root, time: offset + 3.5, duration: '8n' },
+        );
+        break;
+      case 8: // Disco bounce
+        pattern.push(
+          { note: root, time: offset + 0, duration: '8n' },
+          { note: 'G2', time: offset + 0.5, duration: '8n' },
+          { note: root, time: offset + 1, duration: '8n' },
+          { note: 'G2', time: offset + 1.5, duration: '8n' },
+          { note: root, time: offset + 2, duration: '8n' },
+          { note: 'G2', time: offset + 2.5, duration: '8n' },
+          { note: root, time: offset + 3, duration: '8n' },
+          { note: 'G2', time: offset + 3.5, duration: '8n' },
+        );
+        break;
+      case 9: // Minimal sub
+        pattern.push(
+          { note: root, time: offset + 0, duration: '2n' },
+          { note: 'G1', time: offset + 2, duration: '2n' },
         );
         break;
     }
@@ -344,7 +459,7 @@ function generateBassPattern(bars: number, variation: number = 0): NoteEvent[] {
 }
 
 // Helper to generate arpeggio patterns for any bar length
-// variation: 0-4 (A-E) for different arpeggio styles
+// variation: 0-9 for different arpeggio styles
 function generateArpeggioPattern(bars: number, variation: number = 0): NoteEvent[] {
   const chords = [
     ['C4', 'Eb4', 'G4', 'C5'],   // Cm
@@ -360,8 +475,8 @@ function generateArpeggioPattern(bars: number, variation: number = 0): NoteEvent
   for (let bar = 0; bar < bars; bar++) {
     const offset = bar * 4;
     const chord = chords[bar % chords.length];
-    switch (variation) {
-      case 0: // A - Up and down
+    switch (variation % 10) {
+      case 0: // Up and down
         pattern.push(
           { note: chord[0], time: offset + 0, duration: '8n' },
           { note: chord[1], time: offset + 0.5, duration: '8n' },
@@ -373,7 +488,7 @@ function generateArpeggioPattern(bars: number, variation: number = 0): NoteEvent
           { note: chord[1], time: offset + 3.5, duration: '8n' },
         );
         break;
-      case 1: // B - Fast 16ths up
+      case 1: // Fast 16ths up
         pattern.push(
           { note: chord[0], time: offset + 0, duration: '16n' },
           { note: chord[1], time: offset + 0.25, duration: '16n' },
@@ -385,7 +500,7 @@ function generateArpeggioPattern(bars: number, variation: number = 0): NoteEvent
           { note: chord[3], time: offset + 2.75, duration: '16n' },
         );
         break;
-      case 2: // C - Broken chord
+      case 2: // Broken chord
         pattern.push(
           { note: chord[0], time: offset + 0, duration: '8n' },
           { note: chord[2], time: offset + 0.5, duration: '8n' },
@@ -397,7 +512,7 @@ function generateArpeggioPattern(bars: number, variation: number = 0): NoteEvent
           { note: chord[3], time: offset + 3.5, duration: '8n' },
         );
         break;
-      case 3: // D - Triplet feel
+      case 3: // Triplet feel
         pattern.push(
           { note: chord[0], time: offset + 0, duration: '8n' },
           { note: chord[1], time: offset + 0.33, duration: '8n' },
@@ -409,10 +524,66 @@ function generateArpeggioPattern(bars: number, variation: number = 0): NoteEvent
           { note: chord[3], time: offset + 3, duration: '4n' },
         );
         break;
-      case 4: // E - Sparse/ambient
+      case 4: // Sparse/ambient
         pattern.push(
           { note: chord[0], time: offset + 0, duration: '2n' },
           { note: chord[3], time: offset + 2, duration: '2n' },
+        );
+        break;
+      case 5: // Down only
+        pattern.push(
+          { note: chord[3], time: offset + 0, duration: '8n' },
+          { note: chord[2], time: offset + 0.5, duration: '8n' },
+          { note: chord[1], time: offset + 1, duration: '8n' },
+          { note: chord[0], time: offset + 1.5, duration: '8n' },
+          { note: chord[3], time: offset + 2, duration: '8n' },
+          { note: chord[2], time: offset + 2.5, duration: '8n' },
+          { note: chord[1], time: offset + 3, duration: '8n' },
+          { note: chord[0], time: offset + 3.5, duration: '8n' },
+        );
+        break;
+      case 6: // Slow sweep
+        pattern.push(
+          { note: chord[0], time: offset + 0, duration: '4n' },
+          { note: chord[1], time: offset + 1, duration: '4n' },
+          { note: chord[2], time: offset + 2, duration: '4n' },
+          { note: chord[3], time: offset + 3, duration: '4n' },
+        );
+        break;
+      case 7: // Pedal tone
+        pattern.push(
+          { note: chord[0], time: offset + 0, duration: '8n' },
+          { note: chord[3], time: offset + 0.5, duration: '8n' },
+          { note: chord[0], time: offset + 1, duration: '8n' },
+          { note: chord[2], time: offset + 1.5, duration: '8n' },
+          { note: chord[0], time: offset + 2, duration: '8n' },
+          { note: chord[1], time: offset + 2.5, duration: '8n' },
+          { note: chord[0], time: offset + 3, duration: '8n' },
+          { note: chord[3], time: offset + 3.5, duration: '8n' },
+        );
+        break;
+      case 8: // Octave jumps
+        pattern.push(
+          { note: chord[0], time: offset + 0, duration: '8n' },
+          { note: chord[3], time: offset + 0.5, duration: '8n' },
+          { note: chord[0], time: offset + 1, duration: '8n' },
+          { note: chord[3], time: offset + 1.5, duration: '8n' },
+          { note: chord[1], time: offset + 2, duration: '8n' },
+          { note: chord[2], time: offset + 2.5, duration: '8n' },
+          { note: chord[1], time: offset + 3, duration: '8n' },
+          { note: chord[2], time: offset + 3.5, duration: '8n' },
+        );
+        break;
+      case 9: // Random spread
+        pattern.push(
+          { note: chord[2], time: offset + 0, duration: '8n' },
+          { note: chord[0], time: offset + 0.5, duration: '8n' },
+          { note: chord[3], time: offset + 1, duration: '8n' },
+          { note: chord[1], time: offset + 1.5, duration: '8n' },
+          { note: chord[0], time: offset + 2, duration: '8n' },
+          { note: chord[3], time: offset + 2.5, duration: '8n' },
+          { note: chord[2], time: offset + 3, duration: '8n' },
+          { note: chord[1], time: offset + 3.5, duration: '8n' },
         );
         break;
     }
@@ -421,7 +592,7 @@ function generateArpeggioPattern(bars: number, variation: number = 0): NoteEvent
 }
 
 // Helper to generate chord patterns for any bar length
-// variation: 0-4 (A-E) for different chord styles
+// variation: 0-9 for different chord styles
 function generateChordPattern(bars: number, variation: number = 0): NoteEvent[] {
   const chords = [
     ['C4', 'Eb4', 'G4'],   // Cm
@@ -437,21 +608,21 @@ function generateChordPattern(bars: number, variation: number = 0): NoteEvent[] 
   for (let bar = 0; bar < bars; bar++) {
     const offset = bar * 4;
     const chord = chords[bar % chords.length];
-    switch (variation) {
-      case 0: // A - Half notes
+    switch (variation % 10) {
+      case 0: // Half notes
         chord.forEach(note => {
           pattern.push({ note, time: offset + 0, duration: '2n' });
           pattern.push({ note, time: offset + 2, duration: '2n' });
         });
         break;
-      case 1: // B - Stabs
+      case 1: // Stabs
         chord.forEach(note => {
           pattern.push({ note, time: offset + 0, duration: '8n' });
           pattern.push({ note, time: offset + 1, duration: '8n' });
           pattern.push({ note, time: offset + 2.5, duration: '8n' });
         });
         break;
-      case 2: // C - Rhythmic
+      case 2: // Rhythmic
         chord.forEach(note => {
           pattern.push({ note, time: offset + 0, duration: '8n' });
           pattern.push({ note, time: offset + 0.5, duration: '8n' });
@@ -459,17 +630,54 @@ function generateChordPattern(bars: number, variation: number = 0): NoteEvent[] 
           pattern.push({ note, time: offset + 3, duration: '4n' });
         });
         break;
-      case 3: // D - Pad/sustained
+      case 3: // Pad/sustained
         chord.forEach(note => {
           pattern.push({ note, time: offset + 0, duration: '1n' });
         });
         break;
-      case 4: // E - Offbeat
+      case 4: // Offbeat
         chord.forEach(note => {
           pattern.push({ note, time: offset + 0.5, duration: '8n' });
           pattern.push({ note, time: offset + 1.5, duration: '8n' });
           pattern.push({ note, time: offset + 2.5, duration: '8n' });
           pattern.push({ note, time: offset + 3.5, duration: '8n' });
+        });
+        break;
+      case 5: // Pumping quarter notes
+        chord.forEach(note => {
+          pattern.push({ note, time: offset + 0, duration: '4n' });
+          pattern.push({ note, time: offset + 1, duration: '4n' });
+          pattern.push({ note, time: offset + 2, duration: '4n' });
+          pattern.push({ note, time: offset + 3, duration: '4n' });
+        });
+        break;
+      case 6: // Syncopated stabs
+        chord.forEach(note => {
+          pattern.push({ note, time: offset + 0, duration: '8n' });
+          pattern.push({ note, time: offset + 1.5, duration: '8n' });
+          pattern.push({ note, time: offset + 2.5, duration: '4n' });
+        });
+        break;
+      case 7: // Rolling 16ths
+        chord.forEach(note => {
+          pattern.push({ note, time: offset + 0, duration: '16n' });
+          pattern.push({ note, time: offset + 0.25, duration: '16n' });
+          pattern.push({ note, time: offset + 2, duration: '16n' });
+          pattern.push({ note, time: offset + 2.25, duration: '16n' });
+        });
+        break;
+      case 8: // Swell/crescendo feel
+        chord.forEach(note => {
+          pattern.push({ note, time: offset + 0, duration: '4n', velocity: 0.4 });
+          pattern.push({ note, time: offset + 1, duration: '4n', velocity: 0.6 });
+          pattern.push({ note, time: offset + 2, duration: '4n', velocity: 0.8 });
+          pattern.push({ note, time: offset + 3, duration: '4n', velocity: 1.0 });
+        });
+        break;
+      case 9: // Sparse accents
+        chord.forEach(note => {
+          pattern.push({ note, time: offset + 0, duration: '2n' });
+          pattern.push({ note, time: offset + 3, duration: '8n' });
         });
         break;
     }
@@ -478,28 +686,47 @@ function generateChordPattern(bars: number, variation: number = 0): NoteEvent[] 
 }
 
 // Helper to generate lead patterns for any bar length
-// variation: 0-4 (A-E) for different lead styles
+// variation: 0-9 for different lead styles
 function generateLeadPattern(bars: number, variation: number = 0): NoteEvent[] {
   const phraseVariations = [
-    // Variation A - Melodic
+    // Variation 0 - Melodic
     [[{ n: 'G5', t: 0, d: '4n' }, { n: 'Eb5', t: 1, d: '8n' }, { n: 'F5', t: 1.5, d: '8n' }, { n: 'G5', t: 2, d: '2n' }],
      [{ n: 'C6', t: 0, d: '4n' }, { n: 'Bb5', t: 1, d: '8n' }, { n: 'Ab5', t: 1.5, d: '8n' }, { n: 'G5', t: 2, d: '2n' }]],
-    // Variation B - Staccato
+    // Variation 1 - Staccato
     [[{ n: 'G5', t: 0, d: '8n' }, { n: 'G5', t: 0.5, d: '8n' }, { n: 'Ab5', t: 1, d: '8n' }, { n: 'Bb5', t: 2, d: '8n' }, { n: 'C6', t: 3, d: '8n' }],
      [{ n: 'Eb5', t: 0, d: '8n' }, { n: 'F5', t: 1, d: '8n' }, { n: 'G5', t: 2, d: '8n' }, { n: 'Ab5', t: 3, d: '8n' }]],
-    // Variation C - Call and response
+    // Variation 2 - Call and response
     [[{ n: 'C6', t: 0, d: '4n' }, { n: 'Bb5', t: 0.5, d: '4n' }],
      [{ n: 'Ab5', t: 2, d: '4n' }, { n: 'G5', t: 2.5, d: '4n' }]],
-    // Variation D - Legato
+    // Variation 3 - Legato
     [[{ n: 'G5', t: 0, d: '2n' }, { n: 'Ab5', t: 2, d: '2n' }],
      [{ n: 'Bb5', t: 0, d: '2n' }, { n: 'C6', t: 2, d: '2n' }]],
-    // Variation E - High energy
+    // Variation 4 - High energy
     [[{ n: 'C6', t: 0, d: '8n' }, { n: 'Bb5', t: 0.25, d: '8n' }, { n: 'Ab5', t: 0.5, d: '8n' }, { n: 'G5', t: 0.75, d: '8n' },
       { n: 'F5', t: 1, d: '8n' }, { n: 'G5', t: 1.5, d: '8n' }, { n: 'Ab5', t: 2, d: '4n' }],
      [{ n: 'Eb5', t: 0, d: '8n' }, { n: 'F5', t: 0.5, d: '8n' }, { n: 'G5', t: 1, d: '8n' }, { n: 'Ab5', t: 1.5, d: '8n' },
       { n: 'Bb5', t: 2, d: '8n' }, { n: 'C6', t: 2.5, d: '4n' }]],
+    // Variation 5 - Ascending scale run
+    [[{ n: 'C5', t: 0, d: '8n' }, { n: 'D5', t: 0.5, d: '8n' }, { n: 'Eb5', t: 1, d: '8n' }, { n: 'F5', t: 1.5, d: '8n' },
+      { n: 'G5', t: 2, d: '8n' }, { n: 'Ab5', t: 2.5, d: '8n' }, { n: 'Bb5', t: 3, d: '8n' }, { n: 'C6', t: 3.5, d: '8n' }],
+     [{ n: 'C6', t: 0, d: '2n' }, { n: 'G5', t: 2, d: '2n' }]],
+    // Variation 6 - Descending
+    [[{ n: 'C6', t: 0, d: '8n' }, { n: 'Bb5', t: 0.5, d: '8n' }, { n: 'Ab5', t: 1, d: '8n' }, { n: 'G5', t: 1.5, d: '8n' },
+      { n: 'F5', t: 2, d: '8n' }, { n: 'Eb5', t: 2.5, d: '8n' }, { n: 'D5', t: 3, d: '8n' }, { n: 'C5', t: 3.5, d: '8n' }],
+     [{ n: 'G5', t: 0, d: '2n' }, { n: 'C5', t: 2, d: '2n' }]],
+    // Variation 7 - Syncopated melody
+    [[{ n: 'G5', t: 0.5, d: '8n' }, { n: 'Bb5', t: 1, d: '8n' }, { n: 'C6', t: 1.5, d: '4n' }, { n: 'Bb5', t: 2.5, d: '8n' }, { n: 'G5', t: 3, d: '4n' }],
+     [{ n: 'Ab5', t: 0.5, d: '8n' }, { n: 'G5', t: 1, d: '8n' }, { n: 'F5', t: 1.5, d: '4n' }, { n: 'Eb5', t: 2.5, d: '8n' }, { n: 'C5', t: 3, d: '4n' }]],
+    // Variation 8 - Repeated note
+    [[{ n: 'G5', t: 0, d: '8n' }, { n: 'G5', t: 0.5, d: '8n' }, { n: 'G5', t: 1, d: '8n' }, { n: 'Ab5', t: 1.5, d: '8n' },
+      { n: 'G5', t: 2, d: '8n' }, { n: 'G5', t: 2.5, d: '8n' }, { n: 'G5', t: 3, d: '8n' }, { n: 'F5', t: 3.5, d: '8n' }],
+     [{ n: 'Eb5', t: 0, d: '8n' }, { n: 'Eb5', t: 0.5, d: '8n' }, { n: 'Eb5', t: 1, d: '8n' }, { n: 'F5', t: 1.5, d: '8n' },
+      { n: 'Eb5', t: 2, d: '8n' }, { n: 'Eb5', t: 2.5, d: '8n' }, { n: 'Eb5', t: 3, d: '8n' }, { n: 'D5', t: 3.5, d: '8n' }]],
+    // Variation 9 - Wide intervals
+    [[{ n: 'C5', t: 0, d: '4n' }, { n: 'G5', t: 1, d: '4n' }, { n: 'C6', t: 2, d: '2n' }],
+     [{ n: 'Eb5', t: 0, d: '4n' }, { n: 'Bb5', t: 1, d: '4n' }, { n: 'G5', t: 2, d: '2n' }]],
   ];
-  const phrases = phraseVariations[variation] || phraseVariations[0];
+  const phrases = phraseVariations[variation % 10] || phraseVariations[0];
   const pattern: NoteEvent[] = [];
   for (let bar = 0; bar < bars; bar++) {
     const offset = bar * 4;
@@ -512,16 +739,16 @@ function generateLeadPattern(bars: number, variation: number = 0): NoteEvent[] {
 }
 
 // Helper to generate FX patterns for any bar length
-// variation: 0-4 (A-E) for different FX styles
+// variation: 0-9 for different FX styles
 function generateFxPattern(bars: number, variation: number = 0): NoteEvent[] {
   const pattern: NoteEvent[] = [];
   for (let bar = 0; bar < bars; bar++) {
     const offset = bar * 4;
-    switch (variation) {
-      case 0: // A - Sparse sweeps
+    switch (variation % 10) {
+      case 0: // Sparse sweeps
         pattern.push({ note: 'C6', time: offset, duration: '1n' });
         break;
-      case 1: // B - Risers
+      case 1: // Risers
         pattern.push(
           { note: 'C5', time: offset, duration: '4n' },
           { note: 'E5', time: offset + 1, duration: '4n' },
@@ -529,7 +756,7 @@ function generateFxPattern(bars: number, variation: number = 0): NoteEvent[] {
           { note: 'C6', time: offset + 3, duration: '4n' },
         );
         break;
-      case 2: // C - Glitchy
+      case 2: // Glitchy
         pattern.push(
           { note: 'C6', time: offset, duration: '16n' },
           { note: 'C6', time: offset + 0.25, duration: '16n' },
@@ -538,7 +765,7 @@ function generateFxPattern(bars: number, variation: number = 0): NoteEvent[] {
           { note: 'C6', time: offset + 2.75, duration: '16n' },
         );
         break;
-      case 3: // D - Downward
+      case 3: // Downward
         pattern.push(
           { note: 'C6', time: offset, duration: '4n' },
           { note: 'G5', time: offset + 1, duration: '4n' },
@@ -546,12 +773,59 @@ function generateFxPattern(bars: number, variation: number = 0): NoteEvent[] {
           { note: 'C5', time: offset + 3, duration: '4n' },
         );
         break;
-      case 4: // E - Textural
+      case 4: // Textural
         pattern.push(
           { note: 'C5', time: offset, duration: '2n' },
           { note: 'G5', time: offset, duration: '2n' },
           { note: 'E5', time: offset + 2, duration: '2n' },
           { note: 'C6', time: offset + 2, duration: '2n' },
+        );
+        break;
+      case 5: // Stutter
+        pattern.push(
+          { note: 'C6', time: offset, duration: '16n' },
+          { note: 'C6', time: offset + 0.125, duration: '16n' },
+          { note: 'C6', time: offset + 0.25, duration: '16n' },
+          { note: 'C6', time: offset + 2, duration: '16n' },
+          { note: 'C6', time: offset + 2.125, duration: '16n' },
+          { note: 'C6', time: offset + 2.25, duration: '16n' },
+        );
+        break;
+      case 6: // Ambient wash
+        pattern.push(
+          { note: 'C5', time: offset, duration: '1n', velocity: 0.3 },
+          { note: 'G5', time: offset, duration: '1n', velocity: 0.3 },
+          { note: 'C6', time: offset, duration: '1n', velocity: 0.3 },
+        );
+        break;
+      case 7: // Ping pong
+        pattern.push(
+          { note: 'C6', time: offset, duration: '8n' },
+          { note: 'G5', time: offset + 0.5, duration: '8n' },
+          { note: 'C6', time: offset + 1, duration: '8n' },
+          { note: 'G5', time: offset + 1.5, duration: '8n' },
+          { note: 'C6', time: offset + 2, duration: '8n' },
+          { note: 'G5', time: offset + 2.5, duration: '8n' },
+        );
+        break;
+      case 8: // Build tension
+        pattern.push(
+          { note: 'C5', time: offset, duration: '8n', velocity: 0.3 },
+          { note: 'C5', time: offset + 0.5, duration: '8n', velocity: 0.4 },
+          { note: 'C5', time: offset + 1, duration: '8n', velocity: 0.5 },
+          { note: 'C5', time: offset + 1.5, duration: '8n', velocity: 0.6 },
+          { note: 'C5', time: offset + 2, duration: '8n', velocity: 0.7 },
+          { note: 'C5', time: offset + 2.5, duration: '8n', velocity: 0.8 },
+          { note: 'C5', time: offset + 3, duration: '8n', velocity: 0.9 },
+          { note: 'C6', time: offset + 3.5, duration: '8n', velocity: 1.0 },
+        );
+        break;
+      case 9: // Random hits
+        pattern.push(
+          { note: 'G5', time: offset + 0.5, duration: '16n' },
+          { note: 'C6', time: offset + 1.25, duration: '16n' },
+          { note: 'E5', time: offset + 2.75, duration: '16n' },
+          { note: 'C6', time: offset + 3.5, duration: '16n' },
         );
         break;
     }
@@ -560,23 +834,23 @@ function generateFxPattern(bars: number, variation: number = 0): NoteEvent[] {
 }
 
 // Helper to generate vocal patterns for any bar length
-// variation: 0-4 (A-E) for different vocal styles
+// variation: 0-9 for different vocal styles
 function generateVocalPattern(bars: number, variation: number = 0): NoteEvent[] {
   const pattern: NoteEvent[] = [];
   for (let bar = 0; bar < bars; bar++) {
     const offset = bar * 4;
-    switch (variation) {
-      case 0: // A - Sustained
+    switch (variation % 10) {
+      case 0: // Sustained
         pattern.push({ note: 'C5', time: offset, duration: '1n' });
         break;
-      case 1: // B - Melodic phrase
+      case 1: // Melodic phrase
         pattern.push(
           { note: 'C5', time: offset, duration: '4n' },
           { note: 'Eb5', time: offset + 1, duration: '4n' },
           { note: 'G5', time: offset + 2, duration: '2n' },
         );
         break;
-      case 2: // C - Rhythmic
+      case 2: // Rhythmic
         pattern.push(
           { note: 'C5', time: offset, duration: '8n' },
           { note: 'C5', time: offset + 0.5, duration: '8n' },
@@ -585,15 +859,53 @@ function generateVocalPattern(bars: number, variation: number = 0): NoteEvent[] 
           { note: 'Eb5', time: offset + 3, duration: '4n' },
         );
         break;
-      case 3: // D - Breathy/sparse
+      case 3: // Breathy/sparse
         pattern.push({ note: 'G5', time: offset + 2, duration: '2n' });
         break;
-      case 4: // E - Harmonized
+      case 4: // Harmonized
         pattern.push(
           { note: 'C5', time: offset, duration: '2n' },
           { note: 'Eb5', time: offset, duration: '2n' },
           { note: 'G5', time: offset + 2, duration: '2n' },
           { note: 'C6', time: offset + 2, duration: '2n' },
+        );
+        break;
+      case 5: // Call response
+        pattern.push(
+          { note: 'G5', time: offset, duration: '4n' },
+          { note: 'C5', time: offset + 2, duration: '4n' },
+        );
+        break;
+      case 6: // Scat style
+        pattern.push(
+          { note: 'C5', time: offset, duration: '8n' },
+          { note: 'Eb5', time: offset + 0.5, duration: '8n' },
+          { note: 'G5', time: offset + 1, duration: '8n' },
+          { note: 'Eb5', time: offset + 1.5, duration: '8n' },
+          { note: 'C5', time: offset + 2, duration: '8n' },
+          { note: 'G4', time: offset + 2.5, duration: '8n' },
+          { note: 'C5', time: offset + 3, duration: '4n' },
+        );
+        break;
+      case 7: // Choir swell
+        pattern.push(
+          { note: 'C5', time: offset, duration: '1n', velocity: 0.4 },
+          { note: 'Eb5', time: offset, duration: '1n', velocity: 0.4 },
+          { note: 'G5', time: offset, duration: '1n', velocity: 0.4 },
+        );
+        break;
+      case 8: // Staccato chant
+        pattern.push(
+          { note: 'G5', time: offset, duration: '16n' },
+          { note: 'G5', time: offset + 1, duration: '16n' },
+          { note: 'G5', time: offset + 2, duration: '16n' },
+          { note: 'Ab5', time: offset + 3, duration: '16n' },
+        );
+        break;
+      case 9: // Ethereal
+        pattern.push(
+          { note: 'G5', time: offset, duration: '2n', velocity: 0.5 },
+          { note: 'C6', time: offset + 2, duration: '2n', velocity: 0.5 },
         );
         break;
     }
@@ -624,79 +936,42 @@ export const patternGenerators = {
   vocal: generateVocalPattern,
 };
 
-// Default loops for new players - Full instrument x bar length matrix
-// Each row is an instrument type with all 8 bar lengths (1-8)
-const DEFAULT_LOOPS: Omit<Loop, 'id'>[] = [
-  // DRUMS - all bar lengths (red)
-  { name: '1', bars: 1, color: INSTRUMENT_COLORS.drums, pattern: generateDrumPattern(1, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'drums', variation: 0 },
-  { name: '2', bars: 2, color: INSTRUMENT_COLORS.drums, pattern: generateDrumPattern(2, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'drums', variation: 0 },
-  { name: '3', bars: 3, color: INSTRUMENT_COLORS.drums, pattern: generateDrumPattern(3, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'drums', variation: 0 },
-  { name: '4', bars: 4, color: INSTRUMENT_COLORS.drums, pattern: generateDrumPattern(4, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'drums', variation: 0 },
-  { name: '5', bars: 5, color: INSTRUMENT_COLORS.drums, pattern: generateDrumPattern(5, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'drums', variation: 0 },
-  { name: '6', bars: 6, color: INSTRUMENT_COLORS.drums, pattern: generateDrumPattern(6, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'drums', variation: 0 },
-  { name: '7', bars: 7, color: INSTRUMENT_COLORS.drums, pattern: generateDrumPattern(7, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'drums', variation: 0 },
-  { name: '8', bars: 8, color: INSTRUMENT_COLORS.drums, pattern: generateDrumPattern(8, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'drums', variation: 0 },
+// Simple seeded random number generator based on player ID
+// Uses a simple hash function to convert player ID to a seed
+function hashString(str: string): number {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  return Math.abs(hash);
+}
 
-  // BASS - all bar lengths (orange)
-  { name: '1', bars: 1, color: INSTRUMENT_COLORS.bass, pattern: generateBassPattern(1, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'bass', variation: 0 },
-  { name: '2', bars: 2, color: INSTRUMENT_COLORS.bass, pattern: generateBassPattern(2, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'bass', variation: 0 },
-  { name: '3', bars: 3, color: INSTRUMENT_COLORS.bass, pattern: generateBassPattern(3, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'bass', variation: 0 },
-  { name: '4', bars: 4, color: INSTRUMENT_COLORS.bass, pattern: generateBassPattern(4, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'bass', variation: 0 },
-  { name: '5', bars: 5, color: INSTRUMENT_COLORS.bass, pattern: generateBassPattern(5, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'bass', variation: 0 },
-  { name: '6', bars: 6, color: INSTRUMENT_COLORS.bass, pattern: generateBassPattern(6, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'bass', variation: 0 },
-  { name: '7', bars: 7, color: INSTRUMENT_COLORS.bass, pattern: generateBassPattern(7, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'bass', variation: 0 },
-  { name: '8', bars: 8, color: INSTRUMENT_COLORS.bass, pattern: generateBassPattern(8, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'bass', variation: 0 },
+// Seeded random number generator (mulberry32)
+function seededRandom(seed: number): () => number {
+  return function() {
+    let t = seed += 0x6D2B79F5;
+    t = Math.imul(t ^ t >>> 15, t | 1);
+    t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
 
-  // ARPEGGIO - all bar lengths (yellow)
-  { name: '1', bars: 1, color: INSTRUMENT_COLORS.arpeggio, pattern: generateArpeggioPattern(1, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'arpeggio', variation: 0 },
-  { name: '2', bars: 2, color: INSTRUMENT_COLORS.arpeggio, pattern: generateArpeggioPattern(2, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'arpeggio', variation: 0 },
-  { name: '3', bars: 3, color: INSTRUMENT_COLORS.arpeggio, pattern: generateArpeggioPattern(3, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'arpeggio', variation: 0 },
-  { name: '4', bars: 4, color: INSTRUMENT_COLORS.arpeggio, pattern: generateArpeggioPattern(4, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'arpeggio', variation: 0 },
-  { name: '5', bars: 5, color: INSTRUMENT_COLORS.arpeggio, pattern: generateArpeggioPattern(5, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'arpeggio', variation: 0 },
-  { name: '6', bars: 6, color: INSTRUMENT_COLORS.arpeggio, pattern: generateArpeggioPattern(6, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'arpeggio', variation: 0 },
-  { name: '7', bars: 7, color: INSTRUMENT_COLORS.arpeggio, pattern: generateArpeggioPattern(7, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'arpeggio', variation: 0 },
-  { name: '8', bars: 8, color: INSTRUMENT_COLORS.arpeggio, pattern: generateArpeggioPattern(8, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'arpeggio', variation: 0 },
+// Instrument types in order
+type InstrumentKey = 'drums' | 'bass' | 'arpeggio' | 'chord' | 'lead' | 'fx' | 'vocal';
+const INSTRUMENT_TYPES: InstrumentKey[] = ['drums', 'bass', 'arpeggio', 'chord', 'lead', 'fx', 'vocal'];
 
-  // CHORD - all bar lengths (green)
-  { name: '1', bars: 1, color: INSTRUMENT_COLORS.chord, pattern: generateChordPattern(1, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'chord', variation: 0 },
-  { name: '2', bars: 2, color: INSTRUMENT_COLORS.chord, pattern: generateChordPattern(2, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'chord', variation: 0 },
-  { name: '3', bars: 3, color: INSTRUMENT_COLORS.chord, pattern: generateChordPattern(3, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'chord', variation: 0 },
-  { name: '4', bars: 4, color: INSTRUMENT_COLORS.chord, pattern: generateChordPattern(4, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'chord', variation: 0 },
-  { name: '5', bars: 5, color: INSTRUMENT_COLORS.chord, pattern: generateChordPattern(5, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'chord', variation: 0 },
-  { name: '6', bars: 6, color: INSTRUMENT_COLORS.chord, pattern: generateChordPattern(6, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'chord', variation: 0 },
-  { name: '7', bars: 7, color: INSTRUMENT_COLORS.chord, pattern: generateChordPattern(7, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'chord', variation: 0 },
-  { name: '8', bars: 8, color: INSTRUMENT_COLORS.chord, pattern: generateChordPattern(8, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'chord', variation: 0 },
-
-  // LEAD - all bar lengths (blue)
-  { name: '1', bars: 1, color: INSTRUMENT_COLORS.lead, pattern: generateLeadPattern(1, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'lead', variation: 0 },
-  { name: '2', bars: 2, color: INSTRUMENT_COLORS.lead, pattern: generateLeadPattern(2, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'lead', variation: 0 },
-  { name: '3', bars: 3, color: INSTRUMENT_COLORS.lead, pattern: generateLeadPattern(3, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'lead', variation: 0 },
-  { name: '4', bars: 4, color: INSTRUMENT_COLORS.lead, pattern: generateLeadPattern(4, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'lead', variation: 0 },
-  { name: '5', bars: 5, color: INSTRUMENT_COLORS.lead, pattern: generateLeadPattern(5, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'lead', variation: 0 },
-  { name: '6', bars: 6, color: INSTRUMENT_COLORS.lead, pattern: generateLeadPattern(6, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'lead', variation: 0 },
-  { name: '7', bars: 7, color: INSTRUMENT_COLORS.lead, pattern: generateLeadPattern(7, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'lead', variation: 0 },
-  { name: '8', bars: 8, color: INSTRUMENT_COLORS.lead, pattern: generateLeadPattern(8, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'lead', variation: 0 },
-
-  // FX - all bar lengths (purple)
-  { name: '1', bars: 1, color: INSTRUMENT_COLORS.fx, pattern: generateFxPattern(1, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'fx', variation: 0 },
-  { name: '2', bars: 2, color: INSTRUMENT_COLORS.fx, pattern: generateFxPattern(2, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'fx', variation: 0 },
-  { name: '3', bars: 3, color: INSTRUMENT_COLORS.fx, pattern: generateFxPattern(3, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'fx', variation: 0 },
-  { name: '4', bars: 4, color: INSTRUMENT_COLORS.fx, pattern: generateFxPattern(4, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'fx', variation: 0 },
-  { name: '5', bars: 5, color: INSTRUMENT_COLORS.fx, pattern: generateFxPattern(5, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'fx', variation: 0 },
-  { name: '6', bars: 6, color: INSTRUMENT_COLORS.fx, pattern: generateFxPattern(6, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'fx', variation: 0 },
-  { name: '7', bars: 7, color: INSTRUMENT_COLORS.fx, pattern: generateFxPattern(7, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'fx', variation: 0 },
-  { name: '8', bars: 8, color: INSTRUMENT_COLORS.fx, pattern: generateFxPattern(8, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'fx', variation: 0 },
-
-  // VOCAL - all bar lengths (pink)
-  { name: '1', bars: 1, color: INSTRUMENT_COLORS.vocal, pattern: generateVocalPattern(1, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'vocal', variation: 0 },
-  { name: '2', bars: 2, color: INSTRUMENT_COLORS.vocal, pattern: generateVocalPattern(2, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'vocal', variation: 0 },
-  { name: '3', bars: 3, color: INSTRUMENT_COLORS.vocal, pattern: generateVocalPattern(3, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'vocal', variation: 0 },
-  { name: '4', bars: 4, color: INSTRUMENT_COLORS.vocal, pattern: generateVocalPattern(4, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'vocal', variation: 0 },
-  { name: '5', bars: 5, color: INSTRUMENT_COLORS.vocal, pattern: generateVocalPattern(5, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'vocal', variation: 0 },
-  { name: '6', bars: 6, color: INSTRUMENT_COLORS.vocal, pattern: generateVocalPattern(6, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'vocal', variation: 0 },
-  { name: '7', bars: 7, color: INSTRUMENT_COLORS.vocal, pattern: generateVocalPattern(7, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'vocal', variation: 0 },
-  { name: '8', bars: 8, color: INSTRUMENT_COLORS.vocal, pattern: generateVocalPattern(8, 0), volume: 0.8, transpose: 0, muted: true, instrument: 'vocal', variation: 0 },
-];
+// Pattern generator mapping
+const PATTERN_GENERATORS: Record<InstrumentKey, (bars: number, variation: number) => NoteEvent[]> = {
+  drums: generateDrumPattern,
+  bass: generateBassPattern,
+  arpeggio: generateArpeggioPattern,
+  chord: generateChordPattern,
+  lead: generateLeadPattern,
+  fx: generateFxPattern,
+  vocal: generateVocalPattern,
+};
 
 // Default sections
 const DEFAULT_SECTIONS: Omit<Section, 'id'>[] = [
@@ -708,14 +983,45 @@ const DEFAULT_SECTIONS: Omit<Section, 'id'>[] = [
   { name: 'Coda', loops: [], bars: 8, hasMemory: false },
 ];
 
-// All players get all 56 loops (7 instruments × 8 bar lengths)
-function getLoopsForPlayer(): Omit<Loop, 'id'>[] {
-  return DEFAULT_LOOPS;
+// Generate loops for a player with seeded randomization
+// Each player gets different starting variations based on their player ID
+function getLoopsForPlayer(playerId: string): Omit<Loop, 'id'>[] {
+  const seed = hashString(playerId);
+  const random = seededRandom(seed);
+  const loops: Omit<Loop, 'id'>[] = [];
+
+  // For each instrument type
+  for (const instrument of INSTRUMENT_TYPES) {
+    // Generate a random starting variation for this instrument (0-9)
+    const baseVariation = Math.floor(random() * 10);
+    const generator = PATTERN_GENERATORS[instrument];
+    const color = INSTRUMENT_COLORS[instrument];
+
+    // Generate loops for all bar lengths (1-8)
+    for (let bars = 1; bars <= 8; bars++) {
+      loops.push({
+        name: bars.toString(),
+        bars,
+        color,
+        pattern: generator(bars, baseVariation),
+        volume: 0.8,
+        transpose: 0,
+        muted: true,
+        instrument,
+        variation: baseVariation,
+      });
+    }
+  }
+
+  return loops;
 }
+
+// Total loop count (7 instruments × 8 bar lengths)
+const TOTAL_LOOPS_PER_PLAYER = 56;
 
 // Calculate tracks per player for display
 export function getTracksPerPlayer(playerCount: number): { perPlayer: number; total: number } {
-  const perPlayer = DEFAULT_LOOPS.length;
+  const perPlayer = TOTAL_LOOPS_PER_PLAYER;
   return { perPlayer, total: perPlayer * playerCount };
 }
 
@@ -793,8 +1099,8 @@ export class SyncManager {
 
   // Join the room
   join(playerName: string, playerColor: string): Player {
-    // All players get all loops
-    const playerLoops = getLoopsForPlayer();
+    // All players get all loops with randomized starting variations based on their ID
+    const playerLoops = getLoopsForPlayer(this.playerId);
 
     const player: Player = {
       id: this.playerId,

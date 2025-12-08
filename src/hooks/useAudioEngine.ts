@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import * as Tone from 'tone';
 import { audioEngine } from '../audio/AudioEngine';
 import type { Loop, NoteEvent } from '../types';
 
@@ -21,14 +22,36 @@ export function useAudioEngine() {
     };
   }, []);
 
-  const start = useCallback(async () => {
+  // Initialize audio context on first user interaction (critical for iOS)
+  const initAudio = useCallback(async () => {
     if (!isReady) {
-      await audioEngine.start();
-      setIsReady(true);
+      // For iOS Safari, we need to resume the audio context AND call Tone.start()
+      // This must happen in direct response to a user gesture
+      try {
+        // Resume the underlying audio context first (iOS requirement)
+        const ctx = Tone.getContext();
+        if (ctx.state === 'suspended') {
+          await ctx.resume();
+        }
+        // Then start Tone.js
+        await Tone.start();
+        await audioEngine.start();
+        setIsReady(true);
+        console.log('Audio context started successfully');
+      } catch (err) {
+        console.error('Failed to start audio:', err);
+      }
+    }
+  }, [isReady]);
+
+  const start = useCallback(async () => {
+    // Ensure audio is initialized first
+    if (!isReady) {
+      await initAudio();
     }
     audioEngine.play();
     setIsPlaying(true);
-  }, [isReady]);
+  }, [isReady, initAudio]);
 
   const stop = useCallback(() => {
     audioEngine.stop();
@@ -91,11 +114,10 @@ export function useAudioEngine() {
   // Preview pattern before committing (DJ-style pre-listen)
   const previewPattern = useCallback(async (pattern: NoteEvent[], bars: number) => {
     if (!isReady) {
-      await audioEngine.start();
-      setIsReady(true);
+      await initAudio();
     }
     audioEngine.previewPattern(pattern, bars);
-  }, [isReady]);
+  }, [isReady, initAudio]);
 
   const stopPreview = useCallback(() => {
     audioEngine.stopPreview();
@@ -111,6 +133,7 @@ export function useAudioEngine() {
     currentBeat,
     currentBar,
     tempo,
+    initAudio, // Expose for early initialization on user gesture (iOS)
     start,
     stop,
     pause,

@@ -35,7 +35,11 @@ function App() {
   }, []);
 
   // Handle joining/creating room
-  const handleJoin = (name: string, color: string, roomId?: string) => {
+  const handleJoin = async (name: string, color: string, roomId?: string) => {
+    // Initialize audio on this user gesture (critical for iOS)
+    // This is a button click so it satisfies the user interaction requirement
+    await audio.initAudio();
+
     if (roomId) {
       room.joinRoom(roomId, name, color);
     } else {

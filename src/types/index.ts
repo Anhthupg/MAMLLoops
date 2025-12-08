@@ -20,8 +20,11 @@ export interface Loop {
   variation: number; // 0-4 (A-E) for different sample styles
 }
 
-// Variation labels for dropdown
-export const VARIATION_LABELS = ['A', 'B', 'C', 'D', 'E'] as const;
+// Variation count - 10 variations per instrument type
+export const VARIATION_COUNT = 10;
+
+// Variation labels for dropdown (numbers for simplicity, patterns show visual preview)
+export const VARIATION_LABELS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'] as const;
 
 // Incredibox-style instrument types for different musical registers
 export type InstrumentType =
