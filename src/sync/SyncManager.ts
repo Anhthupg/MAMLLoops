@@ -36,7 +36,22 @@ class PeerSync {
       config: {
         iceServers: [
           { urls: 'stun:stun.l.google.com:19302' },
-          { urls: 'stun:global.stun.twilio.com:3478' }
+          { urls: 'stun:stun1.l.google.com:19302' },
+          { urls: 'stun:stun2.l.google.com:19302' },
+          { urls: 'stun:stun3.l.google.com:19302' },
+          { urls: 'stun:stun4.l.google.com:19302' },
+          { urls: 'stun:global.stun.twilio.com:3478' },
+          // Free TURN servers for better mobile connectivity
+          {
+            urls: 'turn:openrelay.metered.ca:80',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
+          },
+          {
+            urls: 'turn:openrelay.metered.ca:443',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
+          }
         ]
       }
     });
@@ -1411,7 +1426,8 @@ export class SyncManager {
       case 'sync_request':
         // Client is requesting state sync - send them the current state
         if (this.isHostFlag) {
-          console.log('Received sync request, sending state to client');
+          console.log('Received sync request, sending state to client, players:', this.state.players.length);
+          console.log('Current state players:', this.state.players.map(p => ({ name: p.name, loops: p.loops.length })));
           this.sync.send({ type: 'state_sync', state: this.state });
         }
         break;
@@ -1422,13 +1438,20 @@ export class SyncManager {
           const myPlayer = this.state.players.find(p => p.id === this.playerId);
           const hostPlayers = message.state.players.filter(p => p.id !== this.playerId);
 
+          console.log('State sync received from host');
+          console.log('  - Host players:', hostPlayers.map(p => p.name));
+          console.log('  - My player:', myPlayer?.name || 'none');
+
           this.state = {
             ...message.state,
             players: myPlayer
               ? [...hostPlayers, myPlayer]
               : hostPlayers,
           };
-          console.log('State sync received, players now:', this.state.players.map(p => p.name));
+          console.log('State sync applied, players now:', this.state.players.map(p => p.name));
+
+          // Notify listeners so UI updates
+          this.notifyListeners();
         }
         break;
       case 'ready':
