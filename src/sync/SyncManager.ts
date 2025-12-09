@@ -1356,7 +1356,12 @@ export class SyncManager {
   // Request full state sync (for late joiners)
   requestSync(): void {
     if (this.isLeader()) {
+      // Host broadcasts its own state
       this.sync.send({ type: 'state_sync', state: this.state });
+    } else {
+      // Client requests state from host
+      console.log('Client requesting state sync from host');
+      this.sync.send({ type: 'sync_request' });
     }
   }
 
