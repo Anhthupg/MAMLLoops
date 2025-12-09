@@ -77,14 +77,45 @@ function App() {
   };
 
   // Handle audio unlock for iOS (when audio context is still suspended)
-  const handleAudioUnlock = async () => {
+  const handleAudioUnlock = useCallback(async () => {
     try {
       await audio.initAudio();
       setNeedsAudioUnlock(false);
+      return true;
     } catch (err) {
       console.error('Audio unlock failed:', err);
+      return false;
     }
-  };
+  }, [audio]);
+
+  // Auto-unlock audio on any user interaction (iOS requirement)
+  useEffect(() => {
+    if (!needsAudioUnlock) return;
+
+    const tryUnlock = async () => {
+      const success = await handleAudioUnlock();
+      if (success) {
+        // Remove all listeners once unlocked
+        document.removeEventListener('touchstart', tryUnlock);
+        document.removeEventListener('touchend', tryUnlock);
+        document.removeEventListener('click', tryUnlock);
+        document.removeEventListener('keydown', tryUnlock);
+      }
+    };
+
+    // Listen for any user interaction
+    document.addEventListener('touchstart', tryUnlock, { passive: true });
+    document.addEventListener('touchend', tryUnlock, { passive: true });
+    document.addEventListener('click', tryUnlock);
+    document.addEventListener('keydown', tryUnlock);
+
+    return () => {
+      document.removeEventListener('touchstart', tryUnlock);
+      document.removeEventListener('touchend', tryUnlock);
+      document.removeEventListener('click', tryUnlock);
+      document.removeEventListener('keydown', tryUnlock);
+    };
+  }, [needsAudioUnlock, handleAudioUnlock]);
 
   // Sync transport state to other devices - use refs to avoid infinite loops
   const lastSyncedTransportRef = useRef({ isPlaying: false, tempo: 120, bar: 0 });
