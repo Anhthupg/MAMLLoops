@@ -31,27 +31,17 @@ class PeerSync {
 
     console.log('Creating peer with ID:', peerId);
 
+    // Use default PeerJS cloud server with better ICE configuration
     this.peer = new Peer(peerId, {
-      debug: 2, // Enable debugging
+      debug: 1, // Less verbose logging
+      host: '0.peerjs.com',
+      port: 443,
+      secure: true,
       config: {
         iceServers: [
           { urls: 'stun:stun.l.google.com:19302' },
           { urls: 'stun:stun1.l.google.com:19302' },
-          { urls: 'stun:stun2.l.google.com:19302' },
-          { urls: 'stun:stun3.l.google.com:19302' },
-          { urls: 'stun:stun4.l.google.com:19302' },
-          { urls: 'stun:global.stun.twilio.com:3478' },
-          // Free TURN servers for better mobile connectivity
-          {
-            urls: 'turn:openrelay.metered.ca:80',
-            username: 'openrelayproject',
-            credential: 'openrelayproject'
-          },
-          {
-            urls: 'turn:openrelay.metered.ca:443',
-            username: 'openrelayproject',
-            credential: 'openrelayproject'
-          }
+          { urls: 'stun:global.stun.twilio.com:3478' }
         ]
       }
     });
