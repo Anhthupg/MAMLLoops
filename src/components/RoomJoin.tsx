@@ -157,6 +157,7 @@ export function RoomShare({ roomId, playerCount, connectionStatus }: RoomSharePr
             title={`${connectionStatus.isHost ? 'Host' : 'Client'} - ${connectionStatus.peerCount} peers`}
           >
             {connectionStatus.connected ? '●' : '○'} {connectionStatus.isHost ? 'Host' : 'Client'}
+            {!connectionStatus.isHost && !connectionStatus.connected && ' (connecting...)'}
             {connectionStatus.peerCount > 0 && ` (${connectionStatus.peerCount})`}
           </span>
         )}

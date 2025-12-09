@@ -110,9 +110,23 @@ class PeerSync {
       if (conn) {
         this.hostConnection = conn;
         this.setupConnection(conn);
+
+        // Retry connection if it doesn't open in 5 seconds
+        setTimeout(() => {
+          if (!conn.open && this.reconnectAttempts < this.maxReconnectAttempts) {
+            console.log('Connection not opened, retrying...');
+            this.reconnectAttempts++;
+            this.connectToHost();
+          }
+        }, 5000);
       }
     } catch (err) {
       console.error('Failed to connect to host:', err);
+      // Retry on error
+      if (this.reconnectAttempts < this.maxReconnectAttempts) {
+        this.reconnectAttempts++;
+        setTimeout(() => this.connectToHost(), 2000);
+      }
     }
   }
 
