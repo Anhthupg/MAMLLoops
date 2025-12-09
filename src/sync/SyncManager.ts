@@ -107,9 +107,15 @@ class PeerSync {
       this.connections.set(conn.peer, conn);
       this.notifyStatus();
 
-      // If we're joining, request state sync
+      // If we're joining, request state sync from host
       if (!this.isHost && conn === this.hostConnection) {
         console.log('Requesting state sync from host...');
+        // Send a sync_request message to the host
+        try {
+          conn.send({ type: 'sync_request' });
+        } catch (err) {
+          console.error('Failed to send sync request:', err);
+        }
       }
     });
 
@@ -1401,6 +1407,13 @@ export class SyncManager {
           nextSectionIndex: null,
           sectionVotes: [],
         };
+        break;
+      case 'sync_request':
+        // Client is requesting state sync - send them the current state
+        if (this.isHostFlag) {
+          console.log('Received sync request, sending state to client');
+          this.sync.send({ type: 'state_sync', state: this.state });
+        }
         break;
       case 'state_sync':
         // Accept state sync if we're not the original leader

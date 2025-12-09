@@ -145,6 +145,7 @@ export type SyncMessage =
   | { type: 'section_vote'; playerId: string; sectionIndex: number }
   | { type: 'create_section_vote'; playerId: string; hasMemory: boolean; loopStateHash: string }
   | { type: 'create_section_reset'; reason: 'pattern_changed' }
+  | { type: 'sync_request' }
   | { type: 'state_sync'; state: RoomState }
   | { type: 'ready'; playerId: string; ready: boolean }
   | { type: 'clock_sync'; clock: ClockSync }
