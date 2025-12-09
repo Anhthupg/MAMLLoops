@@ -1441,6 +1441,7 @@ export class SyncManager {
         }
         break;
       case 'state_sync':
+        console.log('🔄 state_sync received, isHost:', this.isHostFlag, 'players in message:', message.state?.players?.length);
         // Accept state sync if we're not the original leader
         if (!this.isHostFlag) {
           // Merge players - keep our own player, add others from host
@@ -1458,9 +1459,12 @@ export class SyncManager {
               : hostPlayers,
           };
           console.log('State sync applied, players now:', this.state.players.map(p => p.name));
+          console.log('  - Total loops:', this.state.players.reduce((sum, p) => sum + p.loops.length, 0));
 
           // Notify listeners so UI updates
           this.notifyListeners();
+        } else {
+          console.log('Host ignoring own state_sync');
         }
         break;
       case 'ready':
