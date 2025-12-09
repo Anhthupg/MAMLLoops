@@ -44,6 +44,33 @@ body {
   background-clip: text;
 }
 
+/* iOS Audio Unlock Button */
+.audio-unlock-btn {
+  background: linear-gradient(135deg, #ef4444, #f97316);
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  animation: pulse-glow 1.5s ease-in-out infinite;
+  box-shadow: 0 0 20px rgba(239, 68, 68, 0.5);
+}
+
+.audio-unlock-btn:active {
+  transform: scale(0.95);
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(239, 68, 68, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(239, 68, 68, 0.8);
+  }
+}
+
 .app-main {
   flex: 1;
   display: flex;

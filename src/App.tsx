@@ -23,6 +23,7 @@ function App() {
   const [soloedLoopId, setSoloedLoopId] = useState<string | null>(null);
   const [pendingLoopIds, setPendingLoopIds] = useState<string[]>([]);
   const [pendingStopLoopIds, setPendingStopLoopIds] = useState<string[]>([]);
+  const [needsAudioUnlock, setNeedsAudioUnlock] = useState(false);
   const lastBarRef = useRef(0);
 
   const audio = useAudioEngine();
@@ -59,7 +60,13 @@ function App() {
   const handleJoin = async (name: string, color: string, roomId?: string) => {
     // Initialize audio on this user gesture (critical for iOS)
     // This is a button click so it satisfies the user interaction requirement
-    await audio.initAudio();
+    try {
+      await audio.initAudio();
+      setNeedsAudioUnlock(false);
+    } catch (err) {
+      console.warn('Audio init failed, will need unlock:', err);
+      setNeedsAudioUnlock(true);
+    }
 
     if (roomId) {
       room.joinRoom(roomId, name, color);
@@ -67,6 +74,16 @@ function App() {
       room.createRoom(name, color);
     }
     setIsInRoom(true);
+  };
+
+  // Handle audio unlock for iOS (when audio context is still suspended)
+  const handleAudioUnlock = async () => {
+    try {
+      await audio.initAudio();
+      setNeedsAudioUnlock(false);
+    } catch (err) {
+      console.error('Audio unlock failed:', err);
+    }
   };
 
   // Sync transport state to other devices - use refs to avoid infinite loops
@@ -349,6 +366,12 @@ function App() {
     <div className="app">
       <header className="app-header">
         <h1>MAML Loops</h1>
+        {/* iOS Audio Unlock Button - shows when audio context is suspended */}
+        {needsAudioUnlock && (
+          <button className="audio-unlock-btn" onClick={handleAudioUnlock}>
+            🔊 Tap to Enable Sound
+          </button>
+        )}
       </header>
 
       <main className="app-main">

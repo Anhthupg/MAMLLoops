@@ -1405,8 +1405,17 @@ export class SyncManager {
       case 'state_sync':
         // Accept state sync if we're not the original leader
         if (!this.isHostFlag) {
-          this.state = { ...message.state };
-          // Keep our player ID as not the leader
+          // Merge players - keep our own player, add others from host
+          const myPlayer = this.state.players.find(p => p.id === this.playerId);
+          const hostPlayers = message.state.players.filter(p => p.id !== this.playerId);
+
+          this.state = {
+            ...message.state,
+            players: myPlayer
+              ? [...hostPlayers, myPlayer]
+              : hostPlayers,
+          };
+          console.log('State sync received, players now:', this.state.players.map(p => p.name));
         }
         break;
       case 'ready':
@@ -1653,11 +1662,16 @@ export class SyncManager {
       };
 
       // If this is a late joiner and we're the host, send them state
+      // Send multiple times to ensure delivery (connection may still be establishing)
       if (this.isHostFlag && player.id !== this.playerId) {
-        setTimeout(() => {
-          console.log('Sending state sync to new player');
+        const sendStateSync = () => {
+          console.log('Sending state sync to new player, players:', this.state.players.length);
           this.sync.send({ type: 'state_sync', state: this.state });
-        }, 500);
+        };
+        // Send immediately, and again after delays to ensure delivery
+        setTimeout(sendStateSync, 500);
+        setTimeout(sendStateSync, 1500);
+        setTimeout(sendStateSync, 3000);
       }
     }
   }

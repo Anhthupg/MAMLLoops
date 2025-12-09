@@ -50,10 +50,19 @@ export function useAudioEngine() {
         // Then start Tone.js
         await Tone.start();
         await audioEngine.start();
+
+        // Verify the context is actually running (iOS may still block it)
+        const rawContext = Tone.getContext().rawContext;
+        if (rawContext.state !== 'running') {
+          console.warn('Audio context not running after start, state:', rawContext.state);
+          throw new Error('Audio context not running');
+        }
+
         setIsReady(true);
-        console.log('Audio context started successfully');
+        console.log('Audio context started successfully, state:', rawContext.state);
       } catch (err) {
         console.error('Failed to start audio:', err);
+        throw err; // Re-throw so caller knows it failed
       }
     }
   }, [isReady]);
