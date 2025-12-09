@@ -146,6 +146,33 @@ function App() {
     );
   }, [audio.isPlaying, audio.tempo, audio.currentBar, audio.currentBeat, room]);
 
+  // Client: sync transport state FROM host (follow host's play/pause)
+  const lastReceivedTransportRef = useRef({ isPlaying: false });
+  useEffect(() => {
+    if (!room.roomState || room.isLeader()) return;
+
+    const hostIsPlaying = room.roomState.isPlaying;
+    const last = lastReceivedTransportRef.current;
+
+    // Only act on changes
+    if (last.isPlaying !== hostIsPlaying) {
+      lastReceivedTransportRef.current = { isPlaying: hostIsPlaying };
+
+      if (hostIsPlaying && !audio.isPlaying) {
+        console.log('[App] Client: Host started playing, starting local transport');
+        audio.start();
+      } else if (!hostIsPlaying && audio.isPlaying) {
+        console.log('[App] Client: Host stopped, stopping local transport');
+        audio.stop();
+      }
+    }
+
+    // Sync tempo
+    if (room.roomState.tempo !== audio.tempo) {
+      audio.changeTempo(room.roomState.tempo);
+    }
+  }, [room.roomState, room, audio]);
+
   // Get all active loops from all players
   const allLoops = useMemo(() => {
     if (!room.roomState) return [];
@@ -207,33 +234,47 @@ function App() {
     });
   }, [room.roomState, audio]);
 
-  // Track previous patterns to detect changes from other users
-  const prevPatternsRef = useRef<Map<string, string>>(new Map());
+  // Track previous loop states to detect changes from other users
+  const prevLoopStatesRef = useRef<Map<string, { muted: boolean; patternHash: string }>>(new Map());
+  const hasInitialSyncRef = useRef(false);
 
-  // Sync pattern changes from other users to local audio engine
+  // Sync loop states from other players to local audio engine
+  // This handles: initial join, pattern changes, and mute/unmute from other players
   useEffect(() => {
-    if (!room.roomState) return;
+    if (!room.roomState || !room.currentPlayer) return;
 
-    // Get all loops from all players (not just current player)
-    const allPlayerLoops = room.roomState.players.flatMap(p => p.loops);
+    // Get loops from OTHER players (not our own - we control our own loops)
+    const otherPlayersLoops = room.roomState.players
+      .filter(p => p.id !== room.currentPlayer?.id)
+      .flatMap(p => p.loops);
 
-    allPlayerLoops.forEach(loop => {
-      // Create a hash of the pattern for comparison
+    otherPlayersLoops.forEach(loop => {
       const patternHash = JSON.stringify(loop.pattern);
-      const prevHash = prevPatternsRef.current.get(loop.id);
+      const prevState = prevLoopStatesRef.current.get(loop.id);
+      const isActive = !loop.muted;
 
-      // If pattern changed and it's not our own loop (we already update our own)
-      if (prevHash !== undefined && prevHash !== patternHash) {
-        const isOwnLoop = room.currentPlayer?.loops.some(l => l.id === loop.id);
-        if (!isOwnLoop) {
-          // Update audio engine with the new pattern from other user
-          audio.updateLoopPattern(loop.id, loop.pattern);
-        }
+      // First time seeing this loop OR muted state changed
+      if (!prevState || prevState.muted !== loop.muted) {
+        console.log('[App] Other player loop state changed:', loop.id, 'active:', isActive);
+        // Toggle the loop in our audio engine
+        audio.toggleLoop(loop, isActive);
       }
 
-      // Update the ref
-      prevPatternsRef.current.set(loop.id, patternHash);
+      // Pattern changed while loop is active
+      if (prevState && prevState.patternHash !== patternHash && isActive) {
+        console.log('[App] Other player pattern changed:', loop.id);
+        audio.updateLoopPattern(loop.id, loop.pattern);
+      }
+
+      // Update tracked state
+      prevLoopStatesRef.current.set(loop.id, { muted: loop.muted, patternHash });
     });
+
+    // Mark initial sync complete after first run
+    if (!hasInitialSyncRef.current && otherPlayersLoops.length > 0) {
+      hasInitialSyncRef.current = true;
+      console.log('[App] Initial sync of other players loops:', otherPlayersLoops.filter(l => !l.muted).length, 'active');
+    }
   }, [room.roomState, room.currentPlayer, audio]);
 
   // Track section changes and sync audio engine with snapshot (muted states + patterns)
